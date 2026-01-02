@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Hadith Content Studio v3.0 - Kişisel Kullanım CLI Aracı
+Multi-API Support: Google Gemini, Claude, OpenAI
 İyilerin Yolu YouTube Kanalı için Hadis Modernleştirme & Seslendirme Sistemi
 """
 
@@ -9,7 +10,7 @@ import json
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
-from anthropic import Anthropic
+from abc import ABC, abstractmethod
 
 # .env dosyasını yükle
 load_dotenv()
@@ -21,9 +22,6 @@ SCRIPTS_DIR = OUTPUTS_DIR / "scripts"
 
 ANALYSES_DIR.mkdir(parents=True, exist_ok=True)
 SCRIPTS_DIR.mkdir(parents=True, exist_ok=True)
-
-# Claude API Client
-client = Anthropic()
 
 # Sistem Prompt (Hadith Content Studio v3.0)
 SYSTEM_PROMPT = """
@@ -262,29 +260,269 @@ Esselâmu aleyküm ve rahmetullah...
 """
 
 
+# ═══════════════════════════════════════════════════════════════
+# API ADAPTER SYSTEM
+# ═══════════════════════════════════════════════════════════════
+
+class APIAdapter(ABC):
+    """Base class for API providers"""
+
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.conversation_history = []
+
+    @abstractmethod
+    def check_key(self) -> bool:
+        """Check if API key is valid"""
+        pass
+
+    @abstractmethod
+    def chat(self, message: str, system_prompt: str) -> str:
+        """Send message and get response"""
+        pass
+
+    def clear_history(self):
+        """Clear conversation history"""
+        self.conversation_history = []
+
+
+class GeminiAdapter(APIAdapter):
+    """Google Gemini API Adapter"""
+
+    def __init__(self, api_key: str):
+        super().__init__(api_key)
+        try:
+            import google.generativeai as genai
+            self.genai = genai
+            self.genai.configure(api_key=api_key)
+            self.model = self.genai.GenerativeModel("gemini-1.5-pro")
+        except ImportError:
+            raise ImportError("google-generativeai kütüphanesi yüklü değil. Yüklemek için: pip install google-generativeai")
+
+    def check_key(self) -> bool:
+        """Check if API key works"""
+        try:
+            self.genai.configure(api_key=self.api_key)
+            return True
+        except Exception:
+            return False
+
+    def chat(self, message: str, system_prompt: str) -> str:
+        """Send message to Gemini"""
+        try:
+            full_prompt = f"{system_prompt}\n\nKullanıcı: {message}"
+            response = self.model.generate_content(full_prompt)
+            return response.text
+        except Exception as e:
+            raise Exception(f"Gemini API hatası: {str(e)}")
+
+
+class ClaudeAdapter(APIAdapter):
+    """Anthropic Claude API Adapter"""
+
+    def __init__(self, api_key: str):
+        super().__init__(api_key)
+        try:
+            from anthropic import Anthropic
+            self.client = Anthropic(api_key=api_key)
+        except ImportError:
+            raise ImportError("anthropic kütüphanesi yüklü değil. Yüklemek için: pip install anthropic")
+
+    def check_key(self) -> bool:
+        """Check if API key works"""
+        try:
+            self.client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=10,
+                messages=[{"role": "user", "content": "test"}]
+            )
+            return True
+        except Exception:
+            return False
+
+    def chat(self, message: str, system_prompt: str) -> str:
+        """Send message to Claude"""
+        try:
+            self.conversation_history.append({
+                "role": "user",
+                "content": message
+            })
+
+            response = self.client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=2048,
+                system=system_prompt,
+                messages=self.conversation_history
+            )
+
+            assistant_message = response.content[0].text
+            self.conversation_history.append({
+                "role": "assistant",
+                "content": assistant_message
+            })
+
+            return assistant_message
+        except Exception as e:
+            raise Exception(f"Claude API hatası: {str(e)}")
+
+
+class OpenAIAdapter(APIAdapter):
+    """OpenAI API Adapter"""
+
+    def __init__(self, api_key: str):
+        super().__init__(api_key)
+        try:
+            from openai import OpenAI
+            self.client = OpenAI(api_key=api_key)
+        except ImportError:
+            raise ImportError("openai kütüphanesi yüklü değil. Yüklemek için: pip install openai")
+
+    def check_key(self) -> bool:
+        """Check if API key works"""
+        try:
+            self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": "test"}],
+                max_tokens=10
+            )
+            return True
+        except Exception:
+            return False
+
+    def chat(self, message: str, system_prompt: str) -> str:
+        """Send message to OpenAI"""
+        try:
+            self.conversation_history.append({
+                "role": "user",
+                "content": message
+            })
+
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                max_tokens=2048,
+                system=system_prompt,
+                messages=self.conversation_history
+            )
+
+            assistant_message = response.choices[0].message.content
+            self.conversation_history.append({
+                "role": "assistant",
+                "content": assistant_message
+            })
+
+            return assistant_message
+        except Exception as e:
+            raise Exception(f"OpenAI API hatası: {str(e)}")
+
+
+# ═══════════════════════════════════════════════════════════════
+# HADITH STUDIO MAIN CLASS
+# ═══════════════════════════════════════════════════════════════
+
 class HadithStudio:
     """Hadith Content Studio v3.0 - Ana Sınıf"""
 
+    PROVIDERS = {
+        "gemini": {
+            "name": "Google Gemini",
+            "adapter": GeminiAdapter,
+            "key_env": "GOOGLE_API_KEY"
+        },
+        "claude": {
+            "name": "Anthropic Claude",
+            "adapter": ClaudeAdapter,
+            "key_env": "ANTHROPIC_API_KEY"
+        },
+        "openai": {
+            "name": "OpenAI GPT",
+            "adapter": OpenAIAdapter,
+            "key_env": "OPENAI_API_KEY"
+        }
+    }
+
     def __init__(self):
-        self.client = client
-        self.conversation_history = []
+        self.api = None
+        self.current_provider = None
         self.original_hadith = ""
-        self.current_analysis = ""
 
-    def check_api_key(self):
-        """API key kontrol et"""
-        api_key = os.getenv("ANTHROPIC_API_KEY")
+    def select_api(self):
+        """API sağlayıcısını seç"""
+        print("\n" + "="*60)
+        print("🔌 API SAĞLAYICISI SEÇ")
+        print("="*60 + "\n")
+
+        for i, (key, info) in enumerate(self.PROVIDERS.items(), 1):
+            has_key = bool(os.getenv(info["key_env"]))
+            status = "✅" if has_key else "❌"
+            print(f"{i}. {status} {info['name']}")
+
+        print(f"{len(self.PROVIDERS) + 1}. API key'i güncelle\n")
+
+        choice = input("Seçim (1-4): ").strip()
+
+        if choice == str(len(self.PROVIDERS) + 1):
+            self.update_api_keys()
+            return self.select_api()
+
+        try:
+            provider_list = list(self.PROVIDERS.keys())
+            provider = provider_list[int(choice) - 1]
+        except (IndexError, ValueError):
+            print("❌ Hatalı seçim.")
+            return self.select_api()
+
+        api_key = os.getenv(self.PROVIDERS[provider]["key_env"])
+
         if not api_key:
-            print("\n❌ HATA: API key bulunamadı!")
-            print("\n📝 Lütfen şunları yap:")
-            print("1. https://console.anthropic.com/api-keys adresinden key al")
-            print("2. .env dosyası oluştur ve şunu ekle:")
-            print("   ANTHROPIC_API_KEY=sk-ant-v4-xxxxxxx...")
-            print("3. Dosyayı kaydet ve programı yeniden başlat\n")
-            return False
-        return True
+            print(f"\n❌ {self.PROVIDERS[provider]['name']} key'i bulunamadı!")
+            print(f"   .env dosyasını kontrol et.\n")
+            return self.select_api()
 
-    def save_analysis(self, hadith_text, analysis_text):
+        try:
+            self.api = self.PROVIDERS[provider]["adapter"](api_key)
+            self.current_provider = provider
+            print(f"\n✅ {self.PROVIDERS[provider]['name']} seçildi!\n")
+            return True
+        except ImportError as e:
+            print(f"\n❌ Hata: {str(e)}\n")
+            return self.select_api()
+
+    def update_api_keys(self):
+        """API key'lerini güncelle"""
+        print("\n" + "="*60)
+        print("🔑 API KEY'LERİ GÜNCELLE")
+        print("="*60 + "\n")
+
+        env_file = Path(".env")
+        content = ""
+
+        if env_file.exists():
+            with open(env_file, "r", encoding="utf-8") as f:
+                content = f.read()
+
+        for provider, info in self.PROVIDERS.items():
+            key_var = info["key_env"]
+            print(f"\n{info['name']} API key'i gir")
+            print(f"(Boş bırak ve Enter'a bas =  değiştirme)")
+            key = input(f"{key_var}: ").strip()
+
+            if key:
+                # Env dosyasında var mı kontrol et
+                if f"{key_var}=" in content:
+                    # Güncelle
+                    lines = content.split("\n")
+                    content = "\n".join(
+                        [f"{key_var}={key}" if line.startswith(key_var) else line for line in lines]
+                    )
+                else:
+                    # Ekle
+                    content += f"\n{key_var}={key}"
+
+        # Dosyaya kaydet
+        env_file.write_text(content, encoding="utf-8")
+        print("\n✅ .env dosyası güncellendi!\n")
+
+    def save_analysis(self, hadith_text: str, analysis_text: str) -> Path:
         """Kelime analizini dosyaya kaydet"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = ANALYSES_DIR / f"analysis_{timestamp}.txt"
@@ -292,7 +530,7 @@ class HadithStudio:
         with open(filename, "w", encoding="utf-8") as f:
             f.write("="*60 + "\n")
             f.write("HADITH CONTENT STUDIO v3.0\n")
-            f.write("KELİME ANALİZİ\n")
+            f.write(f"KELİME ANALİZİ ({self.PROVIDERS[self.current_provider]['name']})\n")
             f.write("="*60 + "\n\n")
             f.write("ORIJINAL HADİS:\n")
             f.write("-"*60 + "\n")
@@ -303,7 +541,7 @@ class HadithStudio:
 
         return filename
 
-    def save_script(self, script_text, format_type):
+    def save_script(self, script_text: str, format_type: str) -> Path:
         """Seslendirme senaryosunu dosyaya kaydet"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = SCRIPTS_DIR / f"script_{format_type}_{timestamp}.txt"
@@ -312,38 +550,17 @@ class HadithStudio:
             f.write("="*60 + "\n")
             f.write("HADITH CONTENT STUDIO v3.0\n")
             f.write(f"SESLENDİRME SENARYOSU ({format_type.upper()})\n")
+            f.write(f"API: {self.PROVIDERS[self.current_provider]['name']}\n")
             f.write("="*60 + "\n\n")
             f.write(script_text + "\n")
 
         return filename
 
-    def chat(self, user_message):
-        """Claude ile sohbet et"""
-        self.conversation_history.append({
-            "role": "user",
-            "content": user_message
-        })
-
-        response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=2048,
-            system=SYSTEM_PROMPT,
-            messages=self.conversation_history
-        )
-
-        assistant_message = response.content[0].text
-        self.conversation_history.append({
-            "role": "assistant",
-            "content": assistant_message
-        })
-
-        return assistant_message
-
     def start_session(self):
         """Kullanıcı oturumu başlat"""
         print("\n" + "="*60)
         print("🕌 HADITH CONTENT STUDIO v3.0")
-        print("İyilerin Yolu YouTube Kanalı")
+        print("Multi-API Support")
         print("="*60)
         print("\n👋 Hoşgeldin! Hadis gir, sistemi çalıştıralım.\n")
 
@@ -352,23 +569,26 @@ class HadithStudio:
             print("💡 Ne yapmak istiyorsun?")
             print("-"*60)
             print("\n1. Hadis gir (yeni)")
-            print("2. Özel komut gönder (direkt seslendirme, sadece analiz, vb)")
-            print("3. Çık\n")
+            print("2. Özel komut gönder")
+            print("3. API sağlayıcısını değiştir")
+            print("4. Çık\n")
 
-            choice = input("Seçim (1-3): ").strip()
+            choice = input("Seçim (1-4): ").strip()
 
             if choice == "1":
                 self.process_hadith()
             elif choice == "2":
                 self.send_command()
             elif choice == "3":
+                self.select_api()
+            elif choice == "4":
                 print("\n👋 Hoşça kalın!\n")
                 break
             else:
-                print("❌ Hatalı seçim. Lütfen 1-3 arasında bir sayı gir.")
+                print("❌ Hatalı seçim.")
 
     def process_hadith(self):
-        """Hadis işle - Tam akış"""
+        """Hadis işle"""
         print("\n" + "="*60)
         print("📝 HADİS GİRİŞİ")
         print("="*60)
@@ -385,45 +605,40 @@ class HadithStudio:
         hadith_text = "\n".join(lines).strip()
 
         if not hadith_text:
-            print("\n❌ Hadis metni boş. Lütfen geçerli bir hadis gir.\n")
+            print("\n❌ Hadis metni boş.\n")
             return
 
         self.original_hadith = hadith_text
-        self.conversation_history = []
+        self.api.clear_history()
 
-        # Aşama 1: Kelime Analizi
         print("\n⏳ Kelime analizi yapılıyor...\n")
-        analysis = self.chat(hadith_text)
+        analysis = self.api.chat(hadith_text, SYSTEM_PROMPT)
 
         print(analysis)
 
-        # Analizi dosyaya kaydet
         analysis_file = self.save_analysis(hadith_text, analysis)
         print(f"\n💾 Analiz kaydedildi: {analysis_file}\n")
 
-        # Aşama 2: Kullanıcı seçimi
         self.handle_user_choice()
 
     def handle_user_choice(self):
         """Kullanıcı seçimini işle"""
         while True:
-            print("\n" + "-"*60)
             choice = input("\n✏️  Seçiminizi yazın: ").strip().lower()
 
             if not choice:
-                print("❌ Boş girdi. Lütfen bir seçim yap.")
+                print("❌ Boş girdi.")
                 continue
 
-            print(f"\n⏳ İşleniyor: '{choice}'...\n")
-            response = self.chat(choice)
+            print(f"\n⏳ İşleniyor...\n")
+            response = self.api.chat(choice, SYSTEM_PROMPT)
 
             print(response)
 
-            # Senaryo talebi varsa dosyaya kaydet
-            if "senaryo" in response.lower() or "[sakin açılış]" in response:
-                if "video" in choice.lower():
+            if "[sakin açılış]" in response:
+                if "video" in choice:
                     script_file = self.save_script(response, "video")
-                elif "shorts" in choice.lower():
+                elif "shorts" in choice:
                     script_file = self.save_script(response, "shorts")
                 else:
                     script_file = self.save_script(response, "hadis")
@@ -431,37 +646,26 @@ class HadithStudio:
                 print(f"\n💾 Senaryo kaydedildi: {script_file}\n")
                 break
 
-            # "değiştirme" veya "koru" varsa çık
-            if "korundu" in response.lower() or "orijinal" in response.lower():
+            if "korundu" in response.lower():
                 break
 
     def send_command(self):
         """Özel komut gönder"""
         print("\n" + "="*60)
         print("⚡ ÖZEL KOMUTLAR")
-        print("="*60)
-        print("\nÖrnekler:")
-        print("• direkt seslendirme")
-        print("• sadece analiz")
-        print("• shorts yap")
-        print("• tekrar\n")
+        print("="*60 + "\n")
 
         command = input("Komut gir: ").strip()
 
-        if not command:
-            print("❌ Boş komut.")
+        if not command or not self.original_hadith:
+            print("❌ Hata: Önce bir hadis gir!\n")
             return
 
-        if not self.original_hadith:
-            print("\n❌ HATA: Önce bir hadis gir!\n")
-            return
-
-        print(f"\n⏳ İşleniyor: '{command}'...\n")
-        response = self.chat(command)
+        print(f"\n⏳ İşleniyor...\n")
+        response = self.api.chat(command, SYSTEM_PROMPT)
 
         print(response)
 
-        # Senaryo varsa kaydet
         if "[sakin açılış]" in response:
             if "shorts" in command.lower():
                 script_file = self.save_script(response, "shorts")
@@ -475,13 +679,13 @@ def main():
     """Ana giriş"""
     studio = HadithStudio()
 
-    if not studio.check_api_key():
+    if not studio.select_api():
         return
 
     try:
         studio.start_session()
     except KeyboardInterrupt:
-        print("\n\n👋 Hızlıkaldırıldı. Hoşça kalın!\n")
+        print("\n\n👋 Çıkılıyor...\n")
 
 
 if __name__ == "__main__":

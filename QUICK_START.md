@@ -1,27 +1,47 @@
-# Hadith Content Studio v3.0 - Python CLI
+# Hadith Content Studio v3.0 - Multi-API CLI
 
-Kişisel kullanım için Python komut satırı aracı.
+Kişisel kullanım için Python komut satırı aracı - Google Gemini, Claude, OpenAI desteğiyle.
 
 ---
 
 ## ⚙️ Kurulum (5 dakika)
 
-### 1️⃣ Kütüphaneleri Yükle
+### 1️⃣ Python Kütüphanelerini Yükle
 
 ```bash
-pip install anthropic python-dotenv
+# Temel kütüphaneler
+pip install python-dotenv
+
+# Kullanmak istediğin API'lerin kütüphanelerini yükle
+pip install google-generativeai    # Google Gemini için
+pip install anthropic              # Claude için
+pip install openai                 # OpenAI için
+
+# Ya da hepsini aynı anda:
+pip install python-dotenv google-generativeai anthropic openai
 ```
 
-### 2️⃣ API Key Al
+### 2️⃣ API Key'leri Al
 
-1. Git: https://console.anthropic.com/api-keys
-2. "Create Key" tıkla
-3. Anahtarı kopyala: `sk-ant-v4-xxxx...`
+**Google Gemini:**
+- Git: https://aistudio.google.com/app/apikey
+- "Create API Key" tıkla
+- Anahtarı kopyala: `AIzaSy...`
+
+**Claude (Opsiyonel):**
+- Git: https://console.anthropic.com/api-keys
+- "Create Key" tıkla
+- Anahtarı kopyala: `sk-ant-v4-...`
+
+**OpenAI (Opsiyonel):**
+- Git: https://platform.openai.com/api-keys
+- "Create new secret key" tıkla
+- Anahtarı kopyala: `sk-...`
 
 ### 3️⃣ .env Dosyasını Oluştur
 
 ```bash
-# .env.example dosyasını kopyala
+# Şablon dosyasını kopyala
 cp .env.example .env
 
 # Metin editörü aç
@@ -30,19 +50,24 @@ nano .env
 code .env
 ```
 
-`.env` içine bu satırı gir ve API key'ini yapıştır:
+`.env` dosyasını düzenle ve API key'lerini yapıştır:
 
 ```
-ANTHROPIC_API_KEY=sk-ant-v4-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# Google Gemini (şu anda kullanıyorsun)
+GOOGLE_API_KEY=AIzaSyCRaGIhYeZRNd9NL_OgzqCXVxEyMnkJgaU
+
+# Claude (isteğe bağlı)
+ANTHROPIC_API_KEY=
+
+# OpenAI (isteğe bağlı)
+OPENAI_API_KEY=
 ```
 
-Kaydet ve kapat.
+En az **bir API key** lazım. İstediğin diğerini daha sonra ekleyebilirsin.
 
 ---
 
-## 🚀 Kullanım
-
-### Program Başlat
+## 🚀 Program Başlat
 
 ```bash
 python hadith-studio.py
@@ -52,28 +77,37 @@ python hadith-studio.py
 
 ```
 ============================================================
-🕌 HADITH CONTENT STUDIO v3.0
-İyilerin Yolu YouTube Kanalı
+🔌 API SAĞLAYICISI SEÇ
 ============================================================
 
-👋 Hoşgeldin! Hadis gir, sistemi çalıştıralım.
+1. ✅ Google Gemini
+2. ❌ Anthropic Claude
+3. ❌ OpenAI GPT
+4. API key'i güncelle
 
-------------------------------------------------------------
-💡 Ne yapmak istiyorsun?
-------------------------------------------------------------
+Seçim (1-4):
+```
 
+Yapılandırılmış API'yi seç (1) ya da yeni key ekle (4).
+
+---
+
+## 💬 İlk Hadis
+
+Menü seçenekleri:
+
+```
 1. Hadis gir (yeni)
-2. Özel komut gönder (direkt seslendirme, sadece analiz, vb)
-3. Çık
+2. Özel komut gönder
+3. API sağlayıcısını değiştir
+4. Çık
 
-Seçim (1-3):
+Seçim (1-4): 1
 ```
 
-### 1️⃣ Hadis Gir
+Hadis gir:
 
 ```
-Seçim (1-3): 1
-
 ============================================================
 📝 HADİS GİRİŞİ
 ============================================================
@@ -81,35 +115,44 @@ Seçim (1-3): 1
 Hadis metnini gir (Enter'den sonra Ctrl+D ile bitir):
 
 Ebû Hüreyre (r.a.)'den rivayet edildiğine göre Rasûlullah
-(s.a.v.) şöyle buyurdu: "Müminin haline şaşarım! Onun her hali
-hayırdır..."
+(s.a.v.) şöyle buyurdu: "Müminin haline şaşarım!..."
 ^D
 ```
 
-### 2️⃣ Sistem Otomatik Çalışır
+---
 
-**AŞAMA 1: Kelime Analizi**
-- Eski kelimeleri tespit eder
+## ✨ Iş Akışı
+
+### AŞAMA 1: Kelime Analizi
+- Sistem eski kelimeleri tespit eder
 - Tablo gösterir
-- Bekler
+- Seçim bekler
 
-**Cevap Ver:**
+### AŞAMA 2: Seçim Yap
 ```
-hepsini uygula
-```
-
-**AŞAMA 2: Senaryo Formatı**
-- Format seçenekleri sunulur
-- Seçim yap
-
-**Cevap Ver:**
-```
-video
+✏️  Seçiminizi yazın: hepsini uygula
 ```
 
-**AŞAMA 3: Senaryo Üretilir**
-- `outputs/scripts/` klasörüne kaydedilir
+Seçenekler:
+- `hepsini uygula` - Tüm değişiklikleri uygula
+- `sadece yeşilleri` - Sadece 🟢 (güvenli) olanları
+- `1, 3 uygula` - Belirtilen numaraları
+- `değiştirme` - Orijinal metni koru
+
+### AŞAMA 3: Format Seç
+```
+✏️  Seçiminizi yazın: video
+```
+
+Seçenekler:
+- `video` - Tam format (1-3 dakika)
+- `shorts` - Kısa format (60 saniye)
+- `sadece hadis` - Minimal format
+
+### AŞAMA 4: Senaryo Üretilir
+Senaryo otomatik olarak:
 - Terminal'de gösterilir
+- `outputs/scripts/` klasöründe kaydedilir
 
 ---
 
@@ -117,38 +160,87 @@ video
 
 ```
 hadith-studio/
-├── hadith-studio.py          ← Ana program
-├── .env                       ← API key (sen gireceksin)
-├── .env.example               ← Template
-├── outputs/
-│   ├── analyses/              ← Kelime analizi çıktıları
-│   └── scripts/               ← Seslendirme senaryoları
-└── QUICK_START.md             ← Bu dosya
+├── hadith-studio.py          ← Ana program (Multi-API)
+├── .env                       ← Senin API key'lerin (sakın paylaşma!)
+├── .env.example               ← Şablon
+├── QUICK_START.md             ← Bu dosya
+└── outputs/                   ← Çıktılar (otomatik oluşur)
+    ├── analyses/              ← Kelime analiz dosyaları
+    └── scripts/               ← Seslendirme senaryoları
+```
+
+---
+
+## 🔄 API Değiştir
+
+Program içinde istediğin zaman:
+
+```
+Seçim (1-4): 3
+```
+
+Başka API sağlayıcısına geç (ör. Claude'a)
+
+---
+
+## 🔧 Sorun Giderme
+
+### Problem: "API key bulunamadı"
+
+**Çözüm:**
+1. `.env` dosyası var mı?
+2. API key tam kopyalandı mı?
+3. Dosyayı kaydettin mi?
+4. Programı yeniden başlat
+
+### Problem: "kütüphanesi yüklü değil"
+
+```
+google-generativeai kütüphanesi yüklü değil
+```
+
+**Çözüm:**
+```bash
+pip install google-generativeai
+```
+
+### Problem: Menüde API'ler gözükmüyor
+
+- En az bir API key'i `.env`'de gir
+- `GOOGLE_API_KEY=AIzaSy...` formatında olsun
+- Boş satırlardan kaçın
+
+### Problem: Metin girme başarısız (Windows)
+
+Metni yaz, sonra:
+```
+Ctrl+Z
+Enter
 ```
 
 ---
 
 ## 📝 Komutlar
 
-### Kelime Seçimleri
-
+### Ana Menü
 ```
-hepsini uygula        → Tüm değişiklikleri uygula
-sadece yeşilleri      → Sadece 🟢 (güvenli) olanları
-1, 3 uygula           → Belirtilen numaraları uygula
-değiştirme            → Orijinal metni koru
+1 = Hadis gir
+2 = Özel komut
+3 = API değiştir
+4 = Çık
+```
+
+### Kelime Seçimleri
+```
+hepsini uygula    | sadece yeşilleri | 1,3 uygula | değiştirme
 ```
 
 ### Format Seçimleri
-
 ```
-video                 → Tam format (1-3 dakika)
-shorts                → Kısa format (60 saniye)
-sadece hadis          → Minimal format
+video | shorts | sadece hadis
 ```
 
 ### Özel Komutlar
-
 ```
 direkt seslendirme    → Kelime analizi atla
 sadece analiz         → Sadece kelime analizi yap
@@ -158,59 +250,39 @@ tekrar                → Son işlemi tekrarla
 
 ---
 
-## 🔧 Sorun Giderme
+## 💡 En İyi Uygulamalar
 
-### Problem: "API key bulunamadı"
-
-```
-❌ HATA: API key bulunamadı!
-```
-
-**Çözüm:**
-1. `.env` dosyası var mı kontrol et
-2. `ANTHROPIC_API_KEY=` satırı var mı?
-3. Key tam mı kopyalanmış?
-4. Programı yeniden başlat
-
-### Problem: "module not found"
-
-```
-ModuleNotFoundError: No module named 'anthropic'
-```
-
-**Çözüm:**
-```bash
-pip install anthropic python-dotenv
-```
-
-### Problem: Ctrl+D çalışmıyor (Windows)
-
-Windows'ta metni bitirmek için:
-```
-İçeriği yaz
-Ctrl+Z
-Enter
-```
+1. **Başta Gemini dene** - Hızlı ve başarılı
+2. **Claude'a geç** - Uzun hadisler için
+3. **OpenAI** - Alternatif ve back-up
+4. **Dosyaları kontrol et** - `outputs/` klasöründe
 
 ---
 
-## 💡 İpuçları
+## 🔐 Güvenlik
 
-1. **Çokça test et**: Farklı hadislerle dene
-2. **Dosyalar kaydediliyor**: `outputs/` klasöründe saklanıyor
-3. **Konuşma devam ediyor**: Aynı hadisle devam edebilirsin
-4. **Yeni hadis**: Program menüsüne dön (3 → 1)
-
----
-
-## ❓ Sorular?
-
-- API key sorunları: https://console.anthropic.com/docs
-- Python kurulum: https://www.python.org/downloads/
-- Hadis talebi: Programda yazarak ilet
+- ❌ `.env` dosyasını GitHub'a koyma
+- ❌ API key'ini kimseyle paylaşma
+- ✅ `.env` dosyasında tut
+- ✅ `.gitignore` tarafından korunuyor
 
 ---
 
-**Version**: 3.0
+## 🆘 Destek
+
+**Kütüphane kurulum sorunları:**
+- Google: `pip install google-generativeai`
+- Claude: `pip install anthropic`
+- OpenAI: `pip install openai`
+
+**API key sorunları:**
+- Google: https://aistudio.google.com/app/apikey
+- Claude: https://console.anthropic.com/api-keys
+- OpenAI: https://platform.openai.com/api-keys
+
+---
+
+**Version**: 3.0 Multi-API
 **Python**: 3.7+
-**Hazırlanma Tarihi**: 2026-01-02
+**Hazırlama Tarihi**: 2026-01-02
+**Durum**: Üretim Hazır ✅
