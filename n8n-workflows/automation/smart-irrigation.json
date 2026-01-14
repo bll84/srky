@@ -1,0 +1,201 @@
+{
+  "name": "Deneyap - Akıllı Sulama Sistemi",
+  "nodes": [
+    {
+      "parameters": {
+        "topic": "deneyap/sensors/analog",
+        "options": {}
+      },
+      "name": "Toprak Nem Sensörü",
+      "type": "n8n-nodes-base.mqttTrigger",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "credentials": {
+        "mqtt": {
+          "id": "1",
+          "name": "MQTT Broker"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Parse soil moisture sensor data\nconst data = JSON.parse($input.item.json.payload);\n\n// Assuming A0 is soil moisture sensor\nconst soilSensor = data.analog.find(a => a.pin === 'A0');\n\nif (!soilSensor) {\n  return [];\n}\n\n// Convert to percentage (calibrate these values for your sensor)\nconst moisturePercent = Math.round((soilSensor.value / 4095) * 100);\n\nreturn {\n  json: {\n    moisture: moisturePercent,\n    rawValue: soilSensor.value,\n    voltage: soilSensor.voltage,\n    timestamp: new Date()\n  }\n};"
+      },
+      "name": "Parse Moisture Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.moisture}}",
+              "operation": "smaller",
+              "value2": 30
+            }
+          ]
+        }
+      },
+      "name": "Toprak Kuru mu?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "topic": "deneyap/control/gpio",
+        "message": "={{JSON.stringify({\n  pin: 12,\n  action: 'ON'\n})}}",
+        "options": {}
+      },
+      "name": "Sulamayı Aç (Röle ON)",
+      "type": "n8n-nodes-base.mqtt",
+      "typeVersion": 1,
+      "position": [850, 200],
+      "credentials": {
+        "mqtt": {
+          "id": "1",
+          "name": "MQTT Broker"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 30,
+        "unit": "seconds"
+      },
+      "name": "30 Saniye Bekle",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "topic": "deneyap/control/gpio",
+        "message": "={{JSON.stringify({\n  pin: 12,\n  action: 'OFF'\n})}}",
+        "options": {}
+      },
+      "name": "Sulamayı Kapat (Röle OFF)",
+      "type": "n8n-nodes-base.mqtt",
+      "typeVersion": 1,
+      "position": [1250, 200],
+      "credentials": {
+        "mqtt": {
+          "id": "1",
+          "name": "MQTT Broker"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "text": "💧 Sulama Tamamlandı!\n\nToprak nem: {{$node['Parse Moisture Data'].json.moisture}}%\n30 saniye sulama yapıldı.\n\nZaman: {{$json.timestamp}}",
+        "chatId": "YOUR_CHAT_ID",
+        "additionalFields": {}
+      },
+      "name": "Bildirim Gönder",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [1450, 200],
+      "credentials": {
+        "telegramApi": {
+          "id": "2",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "irrigation_logs",
+        "columns": "moisture_percent, duration_seconds, timestamp",
+        "options": {}
+      },
+      "name": "Log Kaydet",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [850, 400],
+      "credentials": {
+        "postgres": {
+          "id": "3",
+          "name": "PostgreSQL"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Toprak Nem Sensörü": {
+      "main": [
+        [
+          {
+            "node": "Parse Moisture Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Moisture Data": {
+      "main": [
+        [
+          {
+            "node": "Toprak Kuru mu?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Toprak Kuru mu?": {
+      "main": [
+        [
+          {
+            "node": "Sulamayı Aç (Röle ON)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Kaydet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sulamayı Aç (Röle ON)": {
+      "main": [
+        [
+          {
+            "node": "30 Saniye Bekle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "30 Saniye Bekle": {
+      "main": [
+        [
+          {
+            "node": "Sulamayı Kapat (Röle OFF)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sulamayı Kapat (Röle OFF)": {
+      "main": [
+        [
+          {
+            "node": "Bildirim Gönder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

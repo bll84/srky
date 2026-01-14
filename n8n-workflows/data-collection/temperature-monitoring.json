@@ -1,0 +1,124 @@
+{
+  "name": "Deneyap - Sıcaklık İzleme",
+  "nodes": [
+    {
+      "parameters": {
+        "topic": "deneyap/sensors/temperature",
+        "options": {}
+      },
+      "name": "MQTT Trigger",
+      "type": "n8n-nodes-base.mqttTrigger",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "credentials": {
+        "mqtt": {
+          "id": "1",
+          "name": "MQTT Broker"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Parse incoming MQTT message\nconst data = JSON.parse($input.item.json.payload);\n\nreturn {\n  json: {\n    temperature: data.temperature,\n    unit: data.unit,\n    timestamp: new Date(data.timestamp),\n    deviceId: 'deneyap-01'\n  }\n};"
+      },
+      "name": "Parse Temperature Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.temperature}}",
+              "operation": "larger",
+              "value2": 30
+            }
+          ]
+        }
+      },
+      "name": "High Temperature?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "text": "⚠️ Yüksek Sıcaklık Alarmı!\n\nDeneyap Kart sıcaklığı: {{$json.temperature}}°C\n\nZaman: {{$json.timestamp}}",
+        "chatId": "YOUR_CHAT_ID",
+        "additionalFields": {}
+      },
+      "name": "Telegram Uyarısı",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [850, 200],
+      "credentials": {
+        "telegramApi": {
+          "id": "2",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "temperature_logs",
+        "columns": "device_id, temperature, unit, timestamp",
+        "options": {}
+      },
+      "name": "Veritabanına Kaydet",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [850, 400],
+      "credentials": {
+        "postgres": {
+          "id": "3",
+          "name": "PostgreSQL"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "MQTT Trigger": {
+      "main": [
+        [
+          {
+            "node": "Parse Temperature Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Temperature Data": {
+      "main": [
+        [
+          {
+            "node": "High Temperature?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "High Temperature?": {
+      "main": [
+        [
+          {
+            "node": "Telegram Uyarısı",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Veritabanına Kaydet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
