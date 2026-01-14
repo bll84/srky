@@ -1,5 +1,5 @@
 {
-  "name": "Deneyap - GPIO Kontrol (Webhook)",
+  "name": "Akıllı Deneyap - GPIO Kontrol (Webhook)",
   "nodes": [
     {
       "parameters": {

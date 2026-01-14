@@ -1,6 +1,6 @@
 # API Dokümantasyonu
 
-Deneyap Kart 1A v2 + n8n sistemi için MQTT ve HTTP REST API referansı.
+Akıllı Deneyap Sistemi için MQTT ve HTTP REST API referansı.
 
 ## 📡 MQTT API
 

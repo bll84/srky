@@ -1,4 +1,4 @@
-# Deneyap Kart 1A v2 + n8n IoT Otomasyon Sistemi
+# Akıllı Deneyap Sistemi
 
 Deneyap Kart 1A v2'nin tüm özelliklerini (kamera hariç) n8n otomasyonu ile entegre eden kapsamlı IoT projesi.
 

@@ -1,5 +1,5 @@
 /*
- * Deneyap Kart 1A v2 + n8n Otomasyon
+ * Akıllı Deneyap Sistemi
  * Konfigürasyon Dosyası
  */
 

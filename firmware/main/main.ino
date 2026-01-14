@@ -1,5 +1,5 @@
 /*
- * Deneyap Kart 1A v2 + n8n IoT Otomasyon Sistemi
+ * Akıllı Deneyap Sistemi
  * Ana Firmware
  *
  * Özellikler:
@@ -47,7 +47,7 @@ void setup() {
   if (DEBUG_MODE) {
     Serial.begin(DEBUG_SERIAL_SPEED);
     Serial.println("\n\n=================================");
-    Serial.println("Deneyap Kart 1A v2 + n8n");
+    Serial.println("Akıllı Deneyap Sistemi");
     Serial.println("Firmware: " + String(FIRMWARE_VERSION));
     Serial.println("=================================\n");
   }
@@ -377,7 +377,7 @@ void setupHTTPServer() {
 
 void handleRoot() {
   String html = "<html><body>";
-  html += "<h1>Deneyap Kart 1A v2 + n8n</h1>";
+  html += "<h1>Akıllı Deneyap Sistemi</h1>";
   html += "<p>Firmware: " + String(FIRMWARE_VERSION) + "</p>";
   html += "<h2>API Endpoints:</h2>";
   html += "<ul>";

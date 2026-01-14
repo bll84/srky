@@ -1,6 +1,6 @@
 # Kurulum Kılavuzu
 
-Deneyap Kart 1A v2 + n8n IoT Otomasyon Sistemi'ni kurmak için adım adım rehber.
+Akıllı Deneyap Sistemi'ni kurmak için adım adım rehber.
 
 ## 📋 Gereksinimler
 
