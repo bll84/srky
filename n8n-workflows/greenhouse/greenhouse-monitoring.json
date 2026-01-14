@@ -1,0 +1,178 @@
+{
+  "name": "Sera - Kapsamlı İzleme ve Alarm",
+  "nodes": [
+    {
+      "parameters": {
+        "topic": "greenhouse/sensors/temperature",
+        "options": {}
+      },
+      "name": "Sıcaklık/Nem Sensörü",
+      "type": "n8n-nodes-base.mqttTrigger",
+      "typeVersion": 1,
+      "position": [250, 200],
+      "credentials": {
+        "mqtt": {"id": "1", "name": "MQTT Broker"}
+      }
+    },
+    {
+      "parameters": {
+        "topic": "greenhouse/sensors/soil",
+        "options": {}
+      },
+      "name": "Toprak Nem Sensörleri",
+      "type": "n8n-nodes-base.mqttTrigger",
+      "typeVersion": 1,
+      "position": [250, 400],
+      "credentials": {
+        "mqtt": {"id": "1", "name": "MQTT Broker"}
+      }
+    },
+    {
+      "parameters": {
+        "topic": "greenhouse/sensors/light",
+        "options": {}
+      },
+      "name": "Işık Sensörü",
+      "type": "n8n-nodes-base.mqttTrigger",
+      "typeVersion": 1,
+      "position": [250, 600],
+      "credentials": {
+        "mqtt": {"id": "1", "name": "MQTT Broker"}
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const data = JSON.parse($input.item.json.payload);\nconst temp = data.temperature;\nconst humidity = data.humidity;\n\nlet alerts = [];\nlet severity = 'normal';\n\nif (temp < 15) {\n  alerts.push('❄️ Sıcaklık çok düşük: ' + temp + '°C');\n  severity = 'critical';\n} else if (temp > 35) {\n  alerts.push('🔥 Sıcaklık çok yüksek: ' + temp + '°C');\n  severity = 'critical';\n} else if (temp < 18 || temp > 30) {\n  alerts.push('⚠️ Sıcaklık normal aralıkta değil: ' + temp + '°C');\n  severity = 'warning';\n}\n\nif (humidity < 40) {\n  alerts.push('💨 Nem çok düşük: %' + humidity);\n  severity = Math.max(severity, 'warning');\n} else if (humidity > 80) {\n  alerts.push('💧 Nem çok yüksek: %' + humidity);\n  severity = Math.max(severity, 'warning');\n}\n\nreturn {\n  json: {\n    sensor: 'temperature_humidity',\n    temperature: temp,\n    humidity: humidity,\n    alerts: alerts,\n    severity: severity,\n    timestamp: new Date(),\n    hasAlerts: alerts.length > 0\n  }\n};"
+      },
+      "name": "Sıcaklık/Nem Analizi",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 200]
+    },
+    {
+      "parameters": {
+        "functionCode": "const data = JSON.parse($input.item.json.payload);\nconst zones = data.zones;\n\nlet alerts = [];\nlet criticalZones = [];\n\nzones.forEach(zone => {\n  if (zone.moisture < 20) {\n    criticalZones.push(zone.name);\n    alerts.push('🚨 ' + zone.name + ' çok kuru: %' + zone.moisture);\n  } else if (zone.moisture < 30) {\n    alerts.push('⚠️ ' + zone.name + ' sulamaya ihtiyaç var: %' + zone.moisture);\n  }\n});\n\nreturn {\n  json: {\n    sensor: 'soil',\n    zones: zones,\n    alerts: alerts,\n    criticalZones: criticalZones,\n    severity: criticalZones.length > 0 ? 'critical' : (alerts.length > 0 ? 'warning' : 'normal'),\n    timestamp: new Date(),\n    hasAlerts: alerts.length > 0\n  }\n};"
+      },
+      "name": "Toprak Nem Analizi",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 400]
+    },
+    {
+      "parameters": {
+        "functionCode": "const data = JSON.parse($input.item.json.payload);\nconst lightPercent = data.light_percent;\nconst level = data.level;\n\nlet alerts = [];\nlet severity = 'normal';\n\nconst hour = new Date().getHours();\nconst isDaytime = (hour >= 6 && hour <= 18);\n\nif (isDaytime && lightPercent < 30) {\n  alerts.push('☀️ Gündüz ışık yetersiz: %' + lightPercent);\n  severity = 'warning';\n}\n\nreturn {\n  json: {\n    sensor: 'light',\n    lightPercent: lightPercent,\n    level: level,\n    isDaytime: isDaytime,\n    alerts: alerts,\n    severity: severity,\n    timestamp: new Date(),\n    hasAlerts: alerts.length > 0\n  }\n};"
+      },
+      "name": "Işık Analizi",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 600]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.hasAlerts}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Alarm Var mı?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 400]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "greenhouse_sensor_data",
+        "columns": "sensor_type, data, severity, timestamp",
+        "options": {}
+      },
+      "name": "Veritabanına Kaydet",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [850, 500],
+      "credentials": {
+        "postgres": {"id": "3", "name": "PostgreSQL"}
+      }
+    },
+    {
+      "parameters": {
+        "text": "🌱 *Sera Alarm*\n\n{{$json.alerts.join('\\n')}}\n\n⏰ Zaman: {{$json.timestamp}}",
+        "chatId": "YOUR_CHAT_ID",
+        "additionalFields": {}
+      },
+      "name": "Telegram Bildirimi",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [850, 300],
+      "credentials": {
+        "telegramApi": {"id": "2", "name": "Telegram Bot"}
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.severity}}",
+              "value2": "critical"
+            }
+          ]
+        }
+      },
+      "name": "Kritik Alarm?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "subject": "🚨 KRİTİK: Sera Alarm",
+        "text": "Seranızda kritik durum var!\n\n{{$json.alerts.join('\\n')}}",
+        "toEmail": "YOUR_EMAIL@example.com"
+      },
+      "name": "Email Gönder",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [1250, 250],
+      "credentials": {
+        "smtp": {"id": "4", "name": "SMTP"}
+      }
+    }
+  ],
+  "connections": {
+    "Sıcaklık/Nem Sensörü": {
+      "main": [[{"node": "Sıcaklık/Nem Analizi", "type": "main", "index": 0}]]
+    },
+    "Toprak Nem Sensörleri": {
+      "main": [[{"node": "Toprak Nem Analizi", "type": "main", "index": 0}]]
+    },
+    "Işık Sensörü": {
+      "main": [[{"node": "Işık Analizi", "type": "main", "index": 0}]]
+    },
+    "Sıcaklık/Nem Analizi": {
+      "main": [[{"node": "Alarm Var mı?", "type": "main", "index": 0}]]
+    },
+    "Toprak Nem Analizi": {
+      "main": [[{"node": "Alarm Var mı?", "type": "main", "index": 0}]]
+    },
+    "Işık Analizi": {
+      "main": [[{"node": "Alarm Var mı?", "type": "main", "index": 0}]]
+    },
+    "Alarm Var mı?": {
+      "main": [
+        [{"node": "Telegram Bildirimi", "type": "main", "index": 0}],
+        [{"node": "Veritabanına Kaydet", "type": "main", "index": 0}]
+      ]
+    },
+    "Telegram Bildirimi": {
+      "main": [[{"node": "Kritik Alarm?", "type": "main", "index": 0}]]
+    },
+    "Kritik Alarm?": {
+      "main": [[{"node": "Email Gönder", "type": "main", "index": 0}]]
+    }
+  }
+}

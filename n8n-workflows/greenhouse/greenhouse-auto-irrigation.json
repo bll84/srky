@@ -1,0 +1,157 @@
+{
+  "name": "Sera - Akıllı Otomatik Sulama",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{"field": "minutes", "minutesInterval": 10}]
+        }
+      },
+      "name": "Her 10 Dakika",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "=http://{{$env.GREENHOUSE_IP}}/api/sensors",
+        "authentication": "none",
+        "responseFormat": "json",
+        "options": {}
+      },
+      "name": "Sensör Verilerini Al",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const sensors = $input.item.json;\nconst soilZones = sensors.soil_moisture;\nconst temperature = sensors.temperature_humidity.temperature;\nconst humidity = sensors.temperature_humidity.humidity;\n\nlet zonesNeedingWater = [];\n\n// Her zone'u kontrol et\nsoilZones.forEach(zone => {\n  let needsWater = false;\n  let duration = 60000; // Varsayılan 60 saniye\n  let reason = '';\n\n  // Toprak nem seviyesi\n  if (zone.moisture < 20) {\n    needsWater = true;\n    duration = 90000; // 90 saniye (çok kuru)\n    reason = 'Çok kuru';\n  } else if (zone.moisture < 30) {\n    needsWater = true;\n    duration = 60000; // 60 saniye\n    reason = 'Kuru';\n  }\n\n  // Hava koşulları kontrolü\n  if (needsWater) {\n    // Çok sıcaksa sulama süresini artır\n    if (temperature > 30) {\n      duration = Math.round(duration * 1.3);\n      reason += ', Sıcak hava';\n    }\n\n    // Nem yüksekse sulama süresini azalt\n    if (humidity > 70) {\n      duration = Math.round(duration * 0.8);\n      reason += ', Yüksek nem';\n    }\n\n    // Gece vakti mi?\n    const hour = new Date().getHours();\n    const isNight = (hour < 6 || hour > 20);\n\n    if (isNight) {\n      // Gece sulamayı ertele (sabah 6'ya kadar bekle)\n      needsWater = false;\n      reason = 'Gece sulama ertelendi';\n    }\n\n    if (needsWater) {\n      zonesNeedingWater.push({\n        zone: zone.zone,\n        name: zone.name,\n        moisture: zone.moisture,\n        duration: duration,\n        reason: reason\n      });\n    }\n  }\n});\n\nreturn {\n  json: {\n    zonesNeedingWater: zonesNeedingWater,\n    hasZonesNeedingWater: zonesNeedingWater.length > 0,\n    temperature: temperature,\n    humidity: humidity,\n    timestamp: new Date()\n  }\n};"
+      },
+      "name": "Sulama Gereksinimini Hesapla",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.hasZonesNeedingWater}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Sulama Gerekli mi?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "name": "Zone'ları Ayır",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "functionCode": "const zone = $input.item.json.zonesNeedingWater[$node['Zone\\'ları Ayır'].index];\n\nreturn {\n  json: {\n    action: 'start',\n    zone: zone.zone,\n    duration: zone.duration,\n    reason: zone.reason\n  }\n};"
+      },
+      "name": "Sulama Komutu Hazırla",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "topic": "greenhouse/control/irrigation",
+        "message": "={{JSON.stringify($json)}}",
+        "options": {}
+      },
+      "name": "MQTT Sulama Komutu",
+      "type": "n8n-nodes-base.mqtt",
+      "typeVersion": 1,
+      "position": [1450, 200],
+      "credentials": {
+        "mqtt": {"id": "1", "name": "MQTT Broker"}
+      }
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "name": "5 Saniye Bekle",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1650, 200]
+    },
+    {
+      "parameters": {
+        "text": "💧 *Otomatik Sulama*\n\n{{$json.zonesNeedingWater.length}} zone sulanıyor:\n\n{{$json.zonesNeedingWater.map(z => '• ' + z.name + ' (%' + z.moisture + ') - ' + (z.duration/1000) + 's\\n  Sebep: ' + z.reason).join('\\n\\n')}}\n\n⏰ {{$json.timestamp}}",
+        "chatId": "YOUR_CHAT_ID",
+        "additionalFields": {}
+      },
+      "name": "Sulama Bildirimi",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [1050, 400],
+      "credentials": {
+        "telegramApi": {"id": "2", "name": "Telegram Bot"}
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "irrigation_log",
+        "columns": "zones, temperature, humidity, timestamp",
+        "options": {}
+      },
+      "name": "Sulama Logla",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [1050, 500],
+      "credentials": {
+        "postgres": {"id": "3", "name": "PostgreSQL"}
+      }
+    }
+  ],
+  "connections": {
+    "Her 10 Dakika": {
+      "main": [[{"node": "Sensör Verilerini Al", "type": "main", "index": 0}]]
+    },
+    "Sensör Verilerini Al": {
+      "main": [[{"node": "Sulama Gereksinimini Hesapla", "type": "main", "index": 0}]]
+    },
+    "Sulama Gereksinimini Hesapla": {
+      "main": [[{"node": "Sulama Gerekli mi?", "type": "main", "index": 0}]]
+    },
+    "Sulama Gerekli mi?": {
+      "main": [
+        [
+          {"node": "Zone'ları Ayır", "type": "main", "index": 0},
+          {"node": "Sulama Bildirimi", "type": "main", "index": 0},
+          {"node": "Sulama Logla", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Zone'ları Ayır": {
+      "main": [[{"node": "Sulama Komutu Hazırla", "type": "main", "index": 0}]]
+    },
+    "Sulama Komutu Hazırla": {
+      "main": [[{"node": "MQTT Sulama Komutu", "type": "main", "index": 0}]]
+    },
+    "MQTT Sulama Komutu": {
+      "main": [[{"node": "5 Saniye Bekle", "type": "main", "index": 0}]]
+    },
+    "5 Saniye Bekle": {
+      "main": [[{"node": "Zone'ları Ayır", "type": "main", "index": 0}]]
+    }
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "name": "Sera - Manuel Kontrol (Webhook)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "greenhouse/control",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "greenhouse-control"
+    },
+    {
+      "parameters": {
+        "functionCode": "const body = $input.item.json.body;\n\nif (!body.system || !body.action) {\n  throw new Error('Missing required fields: system, action');\n}\n\nlet mqttTopic = '';\nlet mqttMessage = {};\n\nswitch(body.system) {\n  case 'irrigation':\n    mqttTopic = 'greenhouse/control/irrigation';\n    mqttMessage = {\n      action: body.action,\n      zone: body.zone,\n      duration: body.duration || 60000\n    };\n    break;\n\n  case 'climate':\n    mqttTopic = 'greenhouse/control/climate';\n    mqttMessage = {\n      action: body.action,\n      temperature: body.temperature,\n      state: body.state\n    };\n    break;\n\n  case 'ventilation':\n    mqttTopic = 'greenhouse/control/ventilation';\n    mqttMessage = {\n      action: body.action,\n      speed: body.speed,\n      angle: body.angle\n    };\n    break;\n\n  default:\n    throw new Error('Unknown system: ' + body.system);\n}\n\nreturn {\n  json: {\n    topic: mqttTopic,\n    message: mqttMessage,\n    originalRequest: body,\n    timestamp: new Date()\n  }\n};"
+      },
+      "name": "Komut İşle ve Hazırla",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "topic": "={{$json.topic}}",
+        "message": "={{JSON.stringify($json.message)}}",
+        "options": {}
+      },
+      "name": "MQTT'ye Gönder",
+      "type": "n8n-nodes-base.mqtt",
+      "typeVersion": 1,
+      "position": [650, 300],
+      "credentials": {
+        "mqtt": {"id": "1", "name": "MQTT Broker"}
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{{\n  success: true,\n  message: 'Komut gönderildi',\n  data: $json.message,\n  timestamp: $json.timestamp\n}}}",
+        "options": {}
+      },
+      "name": "Webhook Yanıtı",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "manual_control_log",
+        "columns": "system, action, data, timestamp",
+        "options": {}
+      },
+      "name": "Kontrol Logla",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [850, 450],
+      "credentials": {
+        "postgres": {"id": "3", "name": "PostgreSQL"}
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [[{"node": "Komut İşle ve Hazırla", "type": "main", "index": 0}]]
+    },
+    "Komut İşle ve Hazırla": {
+      "main": [[{"node": "MQTT'ye Gönder", "type": "main", "index": 0}]]
+    },
+    "MQTT'ye Gönder": {
+      "main": [
+        [
+          {"node": "Webhook Yanıtı", "type": "main", "index": 0},
+          {"node": "Kontrol Logla", "type": "main", "index": 0}
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

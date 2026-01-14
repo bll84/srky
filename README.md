@@ -33,13 +33,16 @@ srky/
 ├── firmware/               # ESP32 Arduino kodu
 │   ├── main/              # Ana firmware
 │   ├── config/            # Konfigürasyon dosyaları
+│   ├── greenhouse/        # 🌱 SERA OTOMASYONU (YENİ!)
 │   ├── sensors/           # Sensör kütüphaneleri
 │   └── examples/          # Örnek uygulamalar
 ├── n8n-workflows/         # n8n workflow dosyaları
 │   ├── data-collection/   # Veri toplama workflows
 │   ├── device-control/    # Cihaz kontrol workflows
+│   ├── greenhouse/        # 🌱 Sera otomasyon workflows (YENİ!)
 │   └── automation/        # Otomasyon scenarios
 ├── docs/                  # Dokümantasyon
+│   ├── greenhouse/        # 🌱 Sera dokümantasyonu (YENİ!)
 │   ├── pinout.md         # Pin bağlantı şeması
 │   ├── setup.md          # Kurulum kılavuzu
 │   └── api.md            # API dokümantasyonu
@@ -98,7 +101,25 @@ POST /api/pwm/:pin            # PWM ayarla
 GET  /api/analog/:pin         # Analog okuma
 ```
 
-## 🎮 Kullanım Senaryoları
+## 🌱 Akıllı Sera Otomasyonu (Öne Çıkan Proje)
+
+**Tam otomatik, 24/7 sera yönetim sistemi!**
+
+### Özellikler
+- 🌡️ **Sıcaklık & Nem İzleme** (DHT22)
+- 💧 **4 Zonlu Otomatik Sulama**
+- ☀️ **Işık Seviyesi Kontrolü**
+- 🌀 **Akıllı Havalandırma** (Fan + Pencere)
+- 🔥 **Isıtma/Soğutma Sistemi**
+- 💡 **Bitki Yetiştirme Lambası**
+- 📱 **Telegram/Email Alarmları**
+- 🤖 **Yapay Zeka Destekli Sulama**
+
+**[📖 Detaylı Sera Dokümantasyonu →](docs/greenhouse/README.md)**
+
+---
+
+## 🎮 Diğer Kullanım Senaryoları
 
 ### 1. Akıllı Ev Otomasyonu
 - Sıcaklık bazlı klima kontrolü
@@ -112,7 +133,7 @@ GET  /api/analog/:pin         # Analog okuma
 
 ### 3. Tarım Otomasyonu
 - Toprak nem sensörü → Sulama kontrolü
-- Sıcaklık/nem → Sera iklim kontrolü
+- Sıcaklık/nem → İklim kontrolü
 - Işık sensörü → Aydınlatma optimizasyonu
 
 ### 4. Data Logger
