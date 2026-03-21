@@ -37,50 +37,50 @@ class DeviceDiscoveryPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
 
-        title = QLabel("Device Discovery")
+        title = QLabel("Cihaz Keşfi")
         title.setObjectName("sectionTitle")
         layout.addWidget(title)
 
-        # Scan buttons
+        # Tarama butonları
         btn_row = QHBoxLayout()
-        self.scan_btn = QPushButton("Scan Devices")
+        self.scan_btn = QPushButton("Cihazları Tara")
         self.scan_btn.setObjectName("primaryBtn")
         self.scan_btn.clicked.connect(self._on_scan)
         btn_row.addWidget(self.scan_btn)
 
-        self.refresh_btn = QPushButton("Refresh")
+        self.refresh_btn = QPushButton("Yenile")
         self.refresh_btn.clicked.connect(self._on_scan)
         btn_row.addWidget(self.refresh_btn)
         layout.addLayout(btn_row)
 
-        # SSH manual entry
-        ssh_group = QGroupBox("SSH Target (Raspberry Pi)")
+        # SSH elle giriş
+        ssh_group = QGroupBox("SSH Hedefi (Raspberry Pi)")
         ssh_layout = QVBoxLayout(ssh_group)
         self.ssh_host_input = QLineEdit()
-        self.ssh_host_input.setPlaceholderText("IP or hostname (e.g. 192.168.1.100)")
+        self.ssh_host_input.setPlaceholderText("IP veya hostname (örn: 192.168.1.100)")
         ssh_layout.addWidget(self.ssh_host_input)
 
         ssh_cred_row = QHBoxLayout()
         self.ssh_user_input = QLineEdit()
-        self.ssh_user_input.setPlaceholderText("User (pi)")
+        self.ssh_user_input.setPlaceholderText("Kullanıcı (pi)")
         self.ssh_user_input.setText("pi")
         ssh_cred_row.addWidget(self.ssh_user_input)
 
         self.ssh_pass_input = QLineEdit()
-        self.ssh_pass_input.setPlaceholderText("Password")
+        self.ssh_pass_input.setPlaceholderText("Şifre")
         self.ssh_pass_input.setEchoMode(QLineEdit.EchoMode.Password)
         ssh_cred_row.addWidget(self.ssh_pass_input)
         ssh_layout.addLayout(ssh_cred_row)
 
-        self.ssh_add_btn = QPushButton("Add SSH Target")
+        self.ssh_add_btn = QPushButton("SSH Hedefi Ekle")
         self.ssh_add_btn.clicked.connect(self._on_add_ssh)
         ssh_layout.addWidget(self.ssh_add_btn)
         layout.addWidget(ssh_group)
 
-        # Device table
+        # Cihaz tablosu
         self.device_table = QTableWidget()
         self.device_table.setColumnCount(4)
-        self.device_table.setHorizontalHeaderLabels(["Device", "Type", "Port/IP", "Conf."])
+        self.device_table.setHorizontalHeaderLabels(["Cihaz", "Tür", "Port/IP", "Güven"])
         self.device_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.device_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         self.device_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
@@ -92,14 +92,14 @@ class DeviceDiscoveryPanel(QWidget):
         self.device_table.cellClicked.connect(self._on_device_clicked)
         layout.addWidget(self.device_table)
 
-        # Connect button
-        self.connect_btn = QPushButton("Connect to Selected")
+        # Bağlan butonu
+        self.connect_btn = QPushButton("Seçilene Bağlan")
         self.connect_btn.setObjectName("primaryBtn")
         self.connect_btn.setEnabled(False)
         self.connect_btn.clicked.connect(self._on_connect)
         layout.addWidget(self.connect_btn)
 
-        self.info_label = QLabel("Click 'Scan Devices' to start")
+        self.info_label = QLabel("Başlamak için 'Cihazları Tara' butonuna tıklayın")
         self.info_label.setObjectName("subtitle")
         self.info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.info_label)
@@ -110,7 +110,7 @@ class DeviceDiscoveryPanel(QWidget):
 
     def _on_scan(self) -> None:
         self.scan_btn.setEnabled(False)
-        self.info_label.setText("Scanning...")
+        self.info_label.setText("Taranıyor...")
         ssh_hosts = []
         if self.ssh_host_input.text().strip():
             ssh_hosts.append(self.ssh_host_input.text().strip())
@@ -120,7 +120,7 @@ class DeviceDiscoveryPanel(QWidget):
     def _on_add_ssh(self) -> None:
         host = self.ssh_host_input.text().strip()
         if not host:
-            self.info_label.setText("Enter an IP or hostname first")
+            self.info_label.setText("Önce bir IP veya hostname girin")
             return
         user = self.ssh_user_input.text().strip() or "pi"
         password = self.ssh_pass_input.text()
@@ -138,7 +138,7 @@ class DeviceDiscoveryPanel(QWidget):
             conf_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.device_table.setItem(row, 3, conf_item)
 
-        self.info_label.setText(f"Found {len(devices)} device(s)")
+        self.info_label.setText(f"{len(devices)} cihaz bulundu")
         self.connect_btn.setEnabled(len(devices) > 0)
 
     def _on_device_clicked(self, row: int, col: int) -> None:

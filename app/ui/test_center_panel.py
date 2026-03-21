@@ -53,29 +53,29 @@ class TestCenterPanel(QWidget):
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
 
-        title = QLabel("Test Center")
+        title = QLabel("Test Merkezi")
         title.setObjectName("sectionTitle")
         layout.addWidget(title)
 
-        self.device_label = QLabel("No device selected")
+        self.device_label = QLabel("Cihaz seçilmedi")
         layout.addWidget(self.device_label)
 
-        # Test buttons
-        btn_group = QGroupBox("Run Tests")
+        # Test butonları
+        btn_group = QGroupBox("Testleri Çalıştır")
         btn_layout = QHBoxLayout(btn_group)
 
-        self.quick_btn = QPushButton("Quick Test")
+        self.quick_btn = QPushButton("Hızlı Test")
         self.quick_btn.setObjectName("primaryBtn")
         self.quick_btn.clicked.connect(lambda: self._run_test("quick"))
         self.quick_btn.setEnabled(False)
         btn_layout.addWidget(self.quick_btn)
 
-        self.full_btn = QPushButton("Full Test")
+        self.full_btn = QPushButton("Tam Test")
         self.full_btn.clicked.connect(lambda: self._run_test("full"))
         self.full_btn.setEnabled(False)
         btn_layout.addWidget(self.full_btn)
 
-        self.stop_btn = QPushButton("Stop")
+        self.stop_btn = QPushButton("Durdur")
         self.stop_btn.setObjectName("dangerBtn")
         self.stop_btn.clicked.connect(self._stop_test)
         self.stop_btn.setEnabled(False)
@@ -83,8 +83,8 @@ class TestCenterPanel(QWidget):
 
         layout.addWidget(btn_group)
 
-        # Progress
-        progress_group = QGroupBox("Progress")
+        # İlerleme
+        progress_group = QGroupBox("İlerleme")
         progress_layout = QVBoxLayout(progress_group)
 
         self.progress_bar = QProgressBar()
@@ -92,24 +92,24 @@ class TestCenterPanel(QWidget):
         self.progress_bar.setValue(0)
         progress_layout.addWidget(self.progress_bar)
 
-        self.progress_label = QLabel("Idle")
+        self.progress_label = QLabel("Bekliyor")
         progress_layout.addWidget(self.progress_label)
 
         layout.addWidget(progress_group)
 
-        # Results summary
-        self.results_group = QGroupBox("Results")
+        # Sonuçlar
+        self.results_group = QGroupBox("Sonuçlar")
         results_layout = QVBoxLayout(self.results_group)
         self.results_text = QPlainTextEdit()
         self.results_text.setReadOnly(True)
         results_layout.addWidget(self.results_text)
         layout.addWidget(self.results_group)
 
-        # Safety warning
+        # Güvenlik uyarısı
         warning = QLabel(
-            "Note: Software tests verify firmware-level responses. "
-            "Physical pin integrity requires jumper-based loopback tests. "
-            "Reserved/boot pins are skipped for safety."
+            "Not: Yazılımsal testler firmware seviyesindeki yanıtları doğrular. "
+            "Fiziksel pin sağlamlığı için jumper kablo ile loopback testi gereklidir. "
+            "Rezerve/boot pinleri güvenlik için atlanır."
         )
         warning.setWordWrap(True)
         warning.setStyleSheet("color: #fab387; font-size: 11px; padding: 8px;")
@@ -121,13 +121,13 @@ class TestCenterPanel(QWidget):
         if device:
             connected = self.controller.is_connected(device_id)
             self.device_label.setText(
-                f"Device: {device.board_model} | "
-                f"{'Connected' if connected else 'Not connected'}"
+                f"Cihaz: {device.board_model} | "
+                f"{'Bağlı' if connected else 'Bağlı değil'}"
             )
             self.quick_btn.setEnabled(connected)
             self.full_btn.setEnabled(connected)
         else:
-            self.device_label.setText("No device selected")
+            self.device_label.setText("Cihaz seçilmedi")
             self.quick_btn.setEnabled(False)
             self.full_btn.setEnabled(False)
 
@@ -149,19 +149,19 @@ class TestCenterPanel(QWidget):
     def _stop_test(self) -> None:
         self.controller.stop_tests()
         self.stop_btn.setEnabled(False)
-        self.progress_label.setText("Stopping...")
+        self.progress_label.setText("Durduruluyor...")
 
     def _on_progress(self, test_id: str, current: int, total: int) -> None:
         pct = int((current / total) * 100) if total > 0 else 0
         self.progress_bar.setValue(pct)
-        self.progress_label.setText(f"Running: {test_id} ({current}/{total})")
+        self.progress_label.setText(f"Çalışıyor: {test_id} ({current}/{total})")
 
     def _on_finished(self, report) -> None:
         self.stop_btn.setEnabled(False)
         self.quick_btn.setEnabled(True)
         self.full_btn.setEnabled(True)
         self.progress_bar.setValue(100)
-        self.progress_label.setText("Complete")
+        self.progress_label.setText("Tamamlandı")
 
         if report:
             from core.report_engine.reporter import ReportEngine

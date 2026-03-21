@@ -36,7 +36,7 @@ class MainWindow(QMainWindow):
     def __init__(self, controller: AppController) -> None:
         super().__init__()
         self.controller = controller
-        self.setWindowTitle("DeviceProbe - Multi-Device Test Platform")
+        self.setWindowTitle("DeviceProbe - Çoklu Cihaz Test Platformu")
         self.setMinimumSize(QSize(1100, 700))
         self.resize(1280, 800)
         self.setStyleSheet(STYLESHEET)
@@ -61,12 +61,12 @@ class MainWindow(QMainWindow):
         title.setObjectName("title")
         header_layout.addWidget(title)
 
-        subtitle = QLabel("Multi-Device Detection & Test Platform")
+        subtitle = QLabel("Çoklu Cihaz Tanıma ve Test Platformu")
         subtitle.setObjectName("subtitle")
         header_layout.addWidget(subtitle)
         header_layout.addStretch()
 
-        self.status_label = QLabel("Ready")
+        self.status_label = QLabel("Hazır")
         self.status_label.setObjectName("subtitle")
         header_layout.addWidget(self.status_label)
 
@@ -86,10 +86,10 @@ class MainWindow(QMainWindow):
         self.pin_matrix = PinMatrixPanel(self.controller)
         self.report_panel = ReportPanel(self.controller)
 
-        self.tabs.addTab(self.detail_panel, "Device Detail")
-        self.tabs.addTab(self.test_center, "Test Center")
-        self.tabs.addTab(self.pin_matrix, "Pin Matrix")
-        self.tabs.addTab(self.report_panel, "Reports")
+        self.tabs.addTab(self.detail_panel, "Cihaz Detayı")
+        self.tabs.addTab(self.test_center, "Test Merkezi")
+        self.tabs.addTab(self.pin_matrix, "Pin Haritası")
+        self.tabs.addTab(self.report_panel, "Raporlar")
 
         splitter.addWidget(self.tabs)
         splitter.setStretchFactor(0, 1)
@@ -98,7 +98,7 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(splitter)
 
         # Status bar
-        self.statusBar().showMessage("DeviceProbe v1.0 - No device selected")
+        self.statusBar().showMessage("DeviceProbe v1.0 - Cihaz seçilmedi")
 
     def _connect_signals(self) -> None:
         self.controller.status_changed.connect(self._on_status)

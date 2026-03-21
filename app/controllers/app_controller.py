@@ -76,7 +76,7 @@ class AppController(QObject):
 
     def scan_devices(self, ssh_hosts: list[str] | None = None) -> None:
         """Scan for all connected devices."""
-        self.status_changed.emit("Scanning devices...")
+        self.status_changed.emit("Cihazlar taranıyor...")
 
         def progress(msg: str) -> None:
             self.status_changed.emit(msg)
@@ -94,7 +94,7 @@ class AppController(QObject):
 
         self._devices = devices
         self.devices_updated.emit()
-        self.status_changed.emit(f"Found {len(devices)} device(s)")
+        self.status_changed.emit(f"{len(devices)} cihaz bulundu")
 
     def add_ssh_device(self, host: str, username: str = "pi", password: str = "") -> None:
         """Manually add an SSH device (Raspberry Pi Linux)."""
@@ -105,7 +105,7 @@ class AppController(QObject):
             board_model="Raspberry Pi (SSH)",
             connection_type=ConnectionType.SSH,
             confidence=0.70,
-            description=f"Manual SSH target: {host}",
+            description=f"Elle eklenen SSH hedefi: {host}",
         )
         profile = self.profile_registry.get("raspberry_pi_linux")
         if profile:
@@ -114,7 +114,7 @@ class AppController(QObject):
         self._ssh_credentials[device.id] = creds
         self._devices.append(device)
         self.devices_updated.emit()
-        self.status_changed.emit(f"Added SSH target: {host}")
+        self.status_changed.emit(f"SSH hedefi eklendi: {host}")
 
     def get_devices(self) -> list[DiscoveredDevice]:
         return self._devices
@@ -131,7 +131,7 @@ class AppController(QObject):
         self._selected_device_id = device_id
         device = self.get_device(device_id)
         if device:
-            self.status_changed.emit(f"Selected: {device.board_model}")
+            self.status_changed.emit(f"Seçildi: {device.board_model}")
             self.device_selected.emit(device_id)
 
     def get_selected_device_id(self) -> str:
@@ -143,7 +143,7 @@ class AppController(QObject):
         """Connect to the currently selected device."""
         device = self.get_device(self._selected_device_id)
         if not device:
-            self.status_changed.emit("No device selected")
+            self.status_changed.emit("Cihaz seçilmedi")
             return False
 
         if device.connection_type == ConnectionType.SSH:
@@ -156,7 +156,7 @@ class AppController(QObject):
 
         if success:
             device.is_connected = True
-            self.status_changed.emit(f"Connected to {device.board_model}")
+            self.status_changed.emit(f"Bağlandı: {device.board_model}")
 
             # Try to identify via plugin
             plugin = self.plugin_registry.get_plugin_for(device)
@@ -167,7 +167,7 @@ class AppController(QObject):
 
             self.device_selected.emit(device.id)
         else:
-            self.status_changed.emit(f"Connection failed: {device.board_model}")
+            self.status_changed.emit(f"Bağlantı başarısız: {device.board_model}")
 
         return success
 
@@ -199,7 +199,7 @@ class AppController(QObject):
 
         profile = self.get_profile(device_id)
         if not profile:
-            self.status_changed.emit("No profile for device")
+            self.status_changed.emit("Cihaz için profil bulunamadı")
             return None
 
         if mode == "full":

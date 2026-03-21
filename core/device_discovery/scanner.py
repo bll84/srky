@@ -147,7 +147,7 @@ class DeviceScanner:
         if best_family == DeviceFamily.UNKNOWN:
             best_confidence = max(best_confidence, 0.20)
             best_family = DeviceFamily.GENERIC_SERIAL
-            best_model = "Unknown Serial Device"
+            best_model = "Bilinmeyen Seri Cihaz"
 
         device.family = best_family
         device.board_model = best_model
@@ -218,17 +218,17 @@ class DeviceScanner:
         devices: list[DiscoveredDevice] = []
 
         if progress_callback:
-            progress_callback("Scanning serial ports...")
+            progress_callback("Seri portlar taranıyor...")
         serial_devices = self.scan_serial_ports()
         devices.extend(serial_devices)
 
         if progress_callback:
-            progress_callback("Scanning SSH hosts...")
+            progress_callback("SSH cihazları taranıyor...")
         ssh_devices = self.scan_ssh_hosts(hosts=ssh_hosts, subnet=ssh_subnet)
         devices.extend(ssh_devices)
 
         if progress_callback:
-            progress_callback(f"Scan complete. Found {len(devices)} device(s).")
+            progress_callback(f"Tarama tamamlandı. {len(devices)} cihaz bulundu.")
 
         return devices
 

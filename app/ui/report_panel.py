@@ -34,37 +34,37 @@ class ReportPanel(QWidget):
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
 
-        title = QLabel("Test Reports")
+        title = QLabel("Test Raporları")
         title.setObjectName("sectionTitle")
         layout.addWidget(title)
 
-        # Controls
+        # Kontroller
         ctrl_layout = QHBoxLayout()
 
         self.format_combo = QComboBox()
-        self.format_combo.addItems(["Text", "JSON", "CSV"])
+        self.format_combo.addItems(["Metin", "JSON", "CSV"])
         self.format_combo.currentTextChanged.connect(self._refresh_view)
         ctrl_layout.addWidget(QLabel("Format:"))
         ctrl_layout.addWidget(self.format_combo)
         ctrl_layout.addStretch()
 
-        self.export_btn = QPushButton("Export Report")
+        self.export_btn = QPushButton("Raporu Dışa Aktar")
         self.export_btn.clicked.connect(self._export)
         self.export_btn.setEnabled(False)
         ctrl_layout.addWidget(self.export_btn)
 
         layout.addLayout(ctrl_layout)
 
-        # Report view
-        report_group = QGroupBox("Report Content")
+        # Rapor görünümü
+        report_group = QGroupBox("Rapor İçeriği")
         report_layout = QVBoxLayout(report_group)
         self.report_text = QPlainTextEdit()
         self.report_text.setReadOnly(True)
         report_layout.addWidget(self.report_text)
         layout.addWidget(report_group)
 
-        # Summary
-        self.summary_label = QLabel("No report available. Run tests first.")
+        # Özet
+        self.summary_label = QLabel("Rapor yok. Önce testleri çalıştırın.")
         self.summary_label.setWordWrap(True)
         layout.addWidget(self.summary_label)
 
@@ -90,10 +90,10 @@ class ReportPanel(QWidget):
 
         self.report_text.setPlainText(text)
         self.summary_label.setText(
-            f"Device: {report.board_model} | "
-            f"Total: {report.total_tests} | "
-            f"Pass: {report.passed} | Fail: {report.failed} | "
-            f"Warn: {report.warnings} | Skip: {report.skipped}"
+            f"Cihaz: {report.board_model} | "
+            f"Toplam: {report.total_tests} | "
+            f"Başarılı: {report.passed} | Başarısız: {report.failed} | "
+            f"Uyarı: {report.warnings} | Atlanan: {report.skipped}"
         )
 
     def _export(self) -> None:
@@ -102,13 +102,13 @@ class ReportPanel(QWidget):
             return
 
         fmt = self.format_combo.currentText()
-        ext_map = {"Text": "txt", "JSON": "json", "CSV": "csv"}
+        ext_map = {"Metin": "txt", "JSON": "json", "CSV": "csv"}
         ext = ext_map.get(fmt, "txt")
 
         path, _ = QFileDialog.getSaveFileName(
-            self, "Export Report",
-            f"report_{report.board_model.replace(' ', '_')}.{ext}",
-            f"{fmt} Files (*.{ext})",
+            self, "Raporu Dışa Aktar",
+            f"rapor_{report.board_model.replace(' ', '_')}.{ext}",
+            f"{fmt} Dosyaları (*.{ext})",
         )
         if path:
             if fmt == "JSON":

@@ -63,8 +63,8 @@ class ReportEngine:
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow([
-            "Test ID", "Test Name", "Description", "Result",
-            "Error Detail", "Recommendation", "Duration (s)",
+            "Test ID", "Test Adı", "Açıklama", "Sonuç",
+            "Hata Detayı", "Öneri", "Süre (s)",
         ])
         for r in report.results:
             writer.writerow([
@@ -78,35 +78,35 @@ class ReportEngine:
         """Export report as formatted text."""
         lines = [
             "=" * 70,
-            "  DeviceProbe Test Report",
+            "  DeviceProbe Test Raporu",
             "=" * 70,
-            f"  Device: {report.device_summary}",
-            f"  Family: {report.device_family}",
-            f"  Model:  {report.board_model}",
-            f"  Connection: {report.connection_type}",
-            f"  Confidence: {report.confidence:.0%}",
-            f"  Date: {datetime.fromtimestamp(report.timestamp).strftime('%Y-%m-%d %H:%M:%S')}",
-            f"  Duration: {report.duration_seconds:.1f}s",
+            f"  Cihaz:    {report.device_summary}",
+            f"  Aile:     {report.device_family}",
+            f"  Model:    {report.board_model}",
+            f"  Bağlantı: {report.connection_type}",
+            f"  Güven:    {report.confidence:.0%}",
+            f"  Tarih:    {datetime.fromtimestamp(report.timestamp).strftime('%Y-%m-%d %H:%M:%S')}",
+            f"  Süre:     {report.duration_seconds:.1f}s",
             "",
-            "  Summary:",
-            f"    Total:       {report.total_tests}",
-            f"    PASS:        {report.passed}",
-            f"    FAIL:        {report.failed}",
-            f"    WARNING:     {report.warnings}",
-            f"    SKIPPED:     {report.skipped}",
-            f"    UNSUPPORTED: {report.unsupported}",
-            f"    ERROR:       {report.errors}",
+            "  Özet:",
+            f"    Toplam:         {report.total_tests}",
+            f"    BAŞARILI:       {report.passed}",
+            f"    BAŞARISIZ:      {report.failed}",
+            f"    UYARI:          {report.warnings}",
+            f"    ATLANAN:        {report.skipped}",
+            f"    DESTEKLENMİYOR: {report.unsupported}",
+            f"    HATA:           {report.errors}",
             "",
             "-" * 70,
         ]
 
         for r in report.results:
             icon = {
-                TestResult.PASS: "[PASS]",
-                TestResult.FAIL: "[FAIL]",
-                TestResult.WARNING: "[WARN]",
-                TestResult.NOT_SUPPORTED: "[N/S] ",
-                TestResult.SKIPPED: "[SKIP]",
+                TestResult.PASS: "[OK]  ",
+                TestResult.FAIL: "[HATA]",
+                TestResult.WARNING: "[UYAR]",
+                TestResult.NOT_SUPPORTED: "[D/Y] ",
+                TestResult.SKIPPED: "[ATLA]",
                 TestResult.ERROR: "[ERR] ",
             }.get(r.result, "[????]")
 
@@ -114,11 +114,11 @@ class ReportEngine:
             if r.description:
                 lines.append(f"         {r.description}")
             if r.error_detail:
-                lines.append(f"         Error: {r.error_detail}")
+                lines.append(f"         Hata: {r.error_detail}")
             if r.recommendation:
-                lines.append(f"         Rec: {r.recommendation}")
+                lines.append(f"         Öneri: {r.recommendation}")
             if r.duration_seconds > 0:
-                lines.append(f"         Duration: {r.duration_seconds:.3f}s")
+                lines.append(f"         Süre: {r.duration_seconds:.3f}s")
             lines.append("")
 
         lines.append("=" * 70)

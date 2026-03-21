@@ -44,11 +44,11 @@ class PinMatrixPanel(QWidget):
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
 
-        title = QLabel("Pin Matrix")
+        title = QLabel("Pin Haritası")
         title.setObjectName("sectionTitle")
         layout.addWidget(title)
 
-        self.device_label = QLabel("No device selected")
+        self.device_label = QLabel("Cihaz seçilmedi")
         layout.addWidget(self.device_label)
 
         # Legend
@@ -67,7 +67,7 @@ class PinMatrixPanel(QWidget):
         self.pin_table = QTableWidget()
         self.pin_table.setColumnCount(7)
         self.pin_table.setHorizontalHeaderLabels([
-            "Pin", "Name", "GPIO", "Functions", "Voltage", "Status", "Notes",
+            "Pin", "Ad", "GPIO", "İşlevler", "Voltaj", "Durum", "Notlar",
         ])
         self.pin_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         self.pin_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)
@@ -76,8 +76,8 @@ class PinMatrixPanel(QWidget):
         self.pin_table.cellClicked.connect(self._on_pin_clicked)
         layout.addWidget(self.pin_table)
 
-        # Detail panel
-        detail_group = QGroupBox("Pin Detail")
+        # Detay paneli
+        detail_group = QGroupBox("Pin Detayı")
         detail_layout = QVBoxLayout(detail_group)
         self.detail_text = QTextEdit()
         self.detail_text.setReadOnly(True)
@@ -85,11 +85,11 @@ class PinMatrixPanel(QWidget):
         detail_layout.addWidget(self.detail_text)
         layout.addWidget(detail_group)
 
-        # Safety notice
+        # Güvenlik notu
         warning = QLabel(
-            "Software-level pin tests verify firmware command responses. "
-            "Physical electrical integrity requires loopback wiring. "
-            "Reserved/boot pins are marked and protected."
+            "Yazılımsal pin testleri firmware komut yanıtlarını doğrular. "
+            "Fiziksel elektriksel bütünlük için loopback kablolaması gereklidir. "
+            "Rezerve/boot pinleri işaretlenmiş ve korumalıdır."
         )
         warning.setWordWrap(True)
         warning.setStyleSheet("color: #fab387; font-size: 11px; padding: 8px;")
@@ -100,11 +100,11 @@ class PinMatrixPanel(QWidget):
         profile = self.controller.get_profile(device_id)
 
         if not device or not profile:
-            self.device_label.setText("No profile available")
+            self.device_label.setText("Profil mevcut değil")
             self.pin_table.setRowCount(0)
             return
 
-        self.device_label.setText(f"{device.board_model} - {len(profile.pins)} pins defined")
+        self.device_label.setText(f"{device.board_model} - {len(profile.pins)} pin tanımlı")
         pins = sorted(profile.pins, key=lambda p: p.number)
         self.pin_table.setRowCount(len(pins))
 
@@ -146,10 +146,10 @@ class PinMatrixPanel(QWidget):
         if pin_name:
             self.detail_text.setHtml(
                 f"<b>Pin:</b> {pin_name.text()}<br>"
-                f"<b>Functions:</b> {functions.text() if functions else '-'}<br>"
-                f"<b>Voltage:</b> {voltage.text() if voltage else '-'}<br>"
-                f"<b>Status:</b> {status.text() if status else '-'}<br>"
-                f"<b>Notes:</b> {notes.text() if notes else '-'}"
+                f"<b>İşlevler:</b> {functions.text() if functions else '-'}<br>"
+                f"<b>Voltaj:</b> {voltage.text() if voltage else '-'}<br>"
+                f"<b>Durum:</b> {status.text() if status else '-'}<br>"
+                f"<b>Notlar:</b> {notes.text() if notes else '-'}"
             )
 
     @staticmethod
