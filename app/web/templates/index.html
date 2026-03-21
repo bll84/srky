@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeviceProbe - Çoklu Cihaz Test Platformu</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <h1 class="logo">DeviceProbe</h1>
+            <span class="subtitle">Çoklu Cihaz Tanıma ve Test Platformu</span>
+        </div>
+        <div class="header-right">
+            <span id="statusText" class="status-text">Hazır</span>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Left Panel: Device Discovery -->
+        <aside class="sidebar">
+            <h2 class="section-title">Cihaz Keşfi</h2>
+
+            <div class="btn-row">
+                <button class="btn btn-primary" onclick="scanDevices()">Cihazları Tara</button>
+                <button class="btn" onclick="scanDevices()">Yenile</button>
+            </div>
+
+            <!-- SSH Target -->
+            <div class="group-box">
+                <h3 class="group-title">SSH Hedefi (Raspberry Pi)</h3>
+                <input type="text" id="sshHost" class="input" placeholder="IP veya hostname (örn: 192.168.1.100)">
+                <div class="input-row">
+                    <input type="text" id="sshUser" class="input" placeholder="Kullanıcı (pi)" value="pi">
+                    <input type="password" id="sshPass" class="input" placeholder="Şifre">
+                </div>
+                <button class="btn" onclick="addSSHDevice()">SSH Hedefi Ekle</button>
+            </div>
+
+            <!-- Device Table -->
+            <div class="device-list" id="deviceList">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Cihaz</th>
+                            <th>Tür</th>
+                            <th>Port/IP</th>
+                            <th>Güven</th>
+                        </tr>
+                    </thead>
+                    <tbody id="deviceTableBody">
+                    </tbody>
+                </table>
+            </div>
+
+            <button class="btn btn-primary btn-full" id="connectBtn" onclick="connectDevice()" disabled>
+                Seçilene Bağlan
+            </button>
+            <p class="info-text" id="infoLabel">Başlamak için 'Cihazları Tara' butonuna tıklayın</p>
+        </aside>
+
+        <!-- Right Panel: Tabs -->
+        <main class="content">
+            <div class="tabs">
+                <button class="tab active" data-tab="detail" onclick="switchTab('detail')">Cihaz Detayı</button>
+                <button class="tab" data-tab="test" onclick="switchTab('test')">Test Merkezi</button>
+                <button class="tab" data-tab="pins" onclick="switchTab('pins')">Pin Haritası</button>
+                <button class="tab" data-tab="report" onclick="switchTab('report')">Raporlar</button>
+            </div>
+
+            <!-- Device Detail Tab -->
+            <div class="tab-content active" id="tab-detail">
+                <h2 class="section-title">Cihaz Detayları</h2>
+                <div class="group-box">
+                    <h3 class="group-title">Cihaz Bilgileri</h3>
+                    <div class="info-grid" id="deviceInfo">
+                        <div class="info-row"><span class="info-key">Model:</span> <span class="info-val" id="infoModel">--</span></div>
+                        <div class="info-row"><span class="info-key">Aile:</span> <span class="info-val" id="infoFamily">--</span></div>
+                        <div class="info-row"><span class="info-key">MCU:</span> <span class="info-val" id="infoMCU">--</span></div>
+                        <div class="info-row"><span class="info-key">Port/IP:</span> <span class="info-val" id="infoPort">--</span></div>
+                        <div class="info-row"><span class="info-key">Bağlantı:</span> <span class="info-val" id="infoConn">--</span></div>
+                        <div class="info-row"><span class="info-key">Güven:</span> <span class="info-val" id="infoConf">--</span></div>
+                        <div class="info-row"><span class="info-key">VID/PID:</span> <span class="info-val" id="infoVidPid">--</span></div>
+                        <div class="info-row"><span class="info-key">Üretici:</span> <span class="info-val" id="infoMfr">--</span></div>
+                        <div class="info-row"><span class="info-key">Seri No:</span> <span class="info-val" id="infoSerial">--</span></div>
+                        <div class="info-row"><span class="info-key">Flash:</span> <span class="info-val" id="infoFlash">--</span></div>
+                        <div class="info-row"><span class="info-key">RAM:</span> <span class="info-val" id="infoRAM">--</span></div>
+                        <div class="info-row"><span class="info-key">Özellikler:</span> <span class="info-val" id="infoFeatures">--</span></div>
+                    </div>
+                </div>
+                <div class="group-box">
+                    <h3 class="group-title">Yetenekler ve Notlar</h3>
+                    <p id="capText" class="cap-text">Detayları görmek için bir cihaz seçin</p>
+                </div>
+            </div>
+
+            <!-- Test Center Tab -->
+            <div class="tab-content" id="tab-test">
+                <h2 class="section-title">Test Merkezi</h2>
+                <p id="testDeviceLabel" class="device-label">Cihaz seçilmedi</p>
+
+                <div class="group-box">
+                    <h3 class="group-title">Testleri Çalıştır</h3>
+                    <div class="btn-row">
+                        <button class="btn btn-primary" id="quickTestBtn" onclick="runTest('quick')" disabled>Hızlı Test</button>
+                        <button class="btn" id="fullTestBtn" onclick="runTest('full')" disabled>Tam Test</button>
+                        <button class="btn btn-danger" id="stopTestBtn" onclick="stopTest()" disabled>Durdur</button>
+                    </div>
+                </div>
+
+                <div class="group-box">
+                    <h3 class="group-title">İlerleme</h3>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressBar" style="width: 0%"></div>
+                    </div>
+                    <p class="progress-text" id="progressLabel">Bekliyor</p>
+                </div>
+
+                <div class="group-box">
+                    <h3 class="group-title">Sonuçlar</h3>
+                    <pre class="code-block" id="resultsText"></pre>
+                </div>
+
+                <p class="warning-text">
+                    Not: Yazılımsal testler firmware seviyesindeki yanıtları doğrular.
+                    Fiziksel pin sağlamlığı için jumper kablo ile loopback testi gereklidir.
+                    Rezerve/boot pinleri güvenlik için atlanır.
+                </p>
+            </div>
+
+            <!-- Pin Matrix Tab -->
+            <div class="tab-content" id="tab-pins">
+                <h2 class="section-title">Pin Haritası</h2>
+                <p id="pinDeviceLabel" class="device-label">Cihaz seçilmedi</p>
+
+                <div class="legend" id="pinLegend">
+                    <span class="legend-item" style="background:#a6e3a1;color:#1e1e2e">available</span>
+                    <span class="legend-item" style="background:#fab387;color:#1e1e2e">reserved</span>
+                    <span class="legend-item" style="background:#f9e2af;color:#1e1e2e">warning</span>
+                    <span class="legend-item" style="background:#a6e3a1;color:#1e1e2e">passed</span>
+                    <span class="legend-item" style="background:#f38ba8;color:#1e1e2e">failed</span>
+                    <span class="legend-item" style="background:#585b70;color:#cdd6f4">unsupported</span>
+                    <span class="legend-item" style="background:#6c7086;color:#cdd6f4">untested</span>
+                </div>
+
+                <div class="pin-table-wrapper">
+                    <table class="table" id="pinTable">
+                        <thead>
+                            <tr>
+                                <th>Pin</th>
+                                <th>Ad</th>
+                                <th>GPIO</th>
+                                <th>İşlevler</th>
+                                <th>Voltaj</th>
+                                <th>Durum</th>
+                                <th>Notlar</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pinTableBody">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="group-box">
+                    <h3 class="group-title">Pin Detayı</h3>
+                    <div id="pinDetail" class="pin-detail">Bir pin seçin</div>
+                </div>
+
+                <p class="warning-text">
+                    Yazılımsal pin testleri firmware komut yanıtlarını doğrular.
+                    Fiziksel elektriksel bütünlük için loopback kablolaması gereklidir.
+                    Rezerve/boot pinleri işaretlenmiş ve korumalıdır.
+                </p>
+            </div>
+
+            <!-- Report Tab -->
+            <div class="tab-content" id="tab-report">
+                <h2 class="section-title">Test Raporları</h2>
+
+                <div class="controls-row">
+                    <label>Format:</label>
+                    <select id="reportFormat" class="select" onchange="loadReport()">
+                        <option value="text">Metin</option>
+                        <option value="json">JSON</option>
+                        <option value="csv">CSV</option>
+                    </select>
+                    <button class="btn" id="exportBtn" onclick="exportReport()" disabled>Raporu Dışa Aktar</button>
+                </div>
+
+                <div class="group-box">
+                    <h3 class="group-title">Rapor İçeriği</h3>
+                    <pre class="code-block" id="reportText"></pre>
+                </div>
+
+                <p id="reportSummary" class="info-text">Rapor yok. Önce testleri çalıştırın.</p>
+            </div>
+        </main>
+    </div>
+
+    <footer class="footer">
+        <span>DeviceProbe v1.0 - Çoklu Cihaz Test Platformu</span>
+        <span id="footerStatus">Cihaz seçilmedi</span>
+    </footer>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
