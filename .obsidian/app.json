@@ -1,0 +1,9 @@
+{
+  "attachmentFolderPath": "Attachments",
+  "newFileLocation": "folder",
+  "newFileFolderPath": "Notes",
+  "showLineNumber": true,
+  "spellcheck": true,
+  "defaultViewMode": "source",
+  "livePreview": true
+}

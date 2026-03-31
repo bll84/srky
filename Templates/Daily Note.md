@@ -1,0 +1,10 @@
+# {{date}}
+
+## Yapılacaklar
+- [ ] 
+
+## Notlar
+
+
+## Fikirler
+
