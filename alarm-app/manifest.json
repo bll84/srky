@@ -1,0 +1,21 @@
+{
+  "name": "Srky Alarm",
+  "short_name": "Alarm",
+  "description": "Basit, hızlı ve çevrimdışı çalışan mobil alarm uygulaması",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1020",
+  "theme_color": "#0b1020",
+  "lang": "tr",
+  "dir": "ltr",
+  "scope": "./",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

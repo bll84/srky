@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#0b1020" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Alarm" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="description" content="Basit, hızlı ve çevrimdışı çalışan mobil alarm uygulaması" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Srky Alarm</title>
+</head>
+<body>
+  <main class="app">
+    <header class="header">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <h1>Alarm</h1>
+      </div>
+      <button id="themeBtn" class="icon-btn" aria-label="Tema değiştir" title="Tema">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+      </button>
+    </header>
+
+    <section class="clock" aria-live="polite">
+      <div id="currentTime" class="clock-time">--:--</div>
+      <div id="currentDate" class="clock-date">--</div>
+    </section>
+
+    <section class="add-card">
+      <h2>Yeni Alarm</h2>
+      <div class="add-row">
+        <input id="alarmTime" type="time" value="07:00" aria-label="Alarm saati" />
+        <input id="alarmLabel" type="text" placeholder="Etiket (ör. Okul)" maxlength="30" aria-label="Alarm etiketi" />
+      </div>
+      <div class="days" role="group" aria-label="Tekrar günleri">
+        <button type="button" class="day" data-day="1">Pzt</button>
+        <button type="button" class="day" data-day="2">Sal</button>
+        <button type="button" class="day" data-day="3">Çar</button>
+        <button type="button" class="day" data-day="4">Per</button>
+        <button type="button" class="day" data-day="5">Cum</button>
+        <button type="button" class="day" data-day="6">Cmt</button>
+        <button type="button" class="day" data-day="0">Paz</button>
+      </div>
+      <div class="add-actions">
+        <label class="sound-label">
+          <span>Ses</span>
+          <select id="alarmSound" aria-label="Alarm sesi">
+            <option value="beep">Klasik Bip</option>
+            <option value="chime">Çan</option>
+            <option value="digital">Dijital</option>
+            <option value="wave">Dalga</option>
+          </select>
+        </label>
+        <button id="addAlarmBtn" class="primary">Ekle</button>
+      </div>
+    </section>
+
+    <section class="list-card">
+      <div class="list-head">
+        <h2>Alarmlarım</h2>
+        <span id="alarmCount" class="count">0</span>
+      </div>
+      <ul id="alarmList" class="alarm-list" aria-live="polite"></ul>
+      <p id="emptyState" class="empty">Henüz alarm yok. Yukarıdan bir alarm ekle.</p>
+    </section>
+
+    <footer class="footer">
+      <p>Ana ekrana ekleyerek uygulama gibi kullanabilirsin.</p>
+    </footer>
+  </main>
+
+  <!-- Alarm ringing modal -->
+  <div id="ringOverlay" class="overlay hidden" role="alertdialog" aria-modal="true" aria-labelledby="ringTitle">
+    <div class="ring-card">
+      <div class="ring-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+          <path d="M10 21a2 2 0 0 0 4 0"/>
+        </svg>
+      </div>
+      <div id="ringTitle" class="ring-title">Alarm!</div>
+      <div id="ringLabel" class="ring-label">—</div>
+      <div class="ring-actions">
+        <button id="snoozeBtn" class="secondary">Ertele 5 dk</button>
+        <button id="stopBtn" class="primary">Durdur</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Permission / unlock prompt -->
+  <div id="unlockBanner" class="banner hidden">
+    <span>Alarmın çalabilmesi için bir kez sayfaya dokun.</span>
+    <button id="unlockBtn" class="primary small">Hazırla</button>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
