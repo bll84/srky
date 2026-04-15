@@ -17,10 +17,12 @@ ISTANBUL_TZ = pytz.timezone("Europe/Istanbul")
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; YT-Tracker/1.0)"}
 STATE_FILE = os.path.join(os.path.dirname(__file__), "seen_videos.json")
 
-# Takip edilecek kanallar: @handle veya UC... channel ID
-CHANNELS = [
-    "@omergcmen",
-]
+import json as _json
+_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.json")
+with open(_CONFIG_PATH) as _f:
+    _CFG = _json.load(_f)
+
+CHANNELS = _CFG["youtube"]["channels"]
 
 
 def _resolve_channel_id(handle: str) -> str:

@@ -1,0 +1,22 @@
+{
+  "news": {
+    "max_stories": 10,
+    "morning_hour": 7,
+    "evening_hour": 18,
+    "keywords": [
+      "llm", "large language model", "claude", "chatgpt", "gpt-4", "gpt-5",
+      "gemini", "anthropic", "openai", "deepmind", "mistral", "llama",
+      "meta ai", "generative ai", "yapay zeka", "language model"
+    ],
+    "feeds": [
+      "https://news.google.com/rss/search?q=Claude+GPT+Gemini+Anthropic+OpenAI+LLM&hl=en-US&gl=US&ceid=US:en",
+      "https://news.google.com/rss/search?q=yapay+zeka+LLM+Claude+GPT+Gemini&hl=tr&gl=TR&ceid=TR:tr",
+      "https://venturebeat.com/category/ai/feed/",
+      "https://techcrunch.com/category/artificial-intelligence/feed/"
+    ]
+  },
+  "youtube": {
+    "channels": ["@omergcmen"],
+    "check_interval_hours": 8
+  }
+}

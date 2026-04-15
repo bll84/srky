@@ -30,7 +30,11 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-from llm_news.routine import run_news_routine  # noqa: E402 (after logging setup)
+import json
+with open(os.path.join(os.path.dirname(__file__), "config.json")) as _f:
+    _CFG = json.load(_f)
+
+from llm_news.routine import run_news_routine  # noqa: E402
 from youtube_tracker.tracker import run_youtube_tracker  # noqa: E402
 
 ISTANBUL_TZ = pytz.timezone("Europe/Istanbul")
@@ -49,12 +53,12 @@ def run_if_istanbul_time(target_hour: int) -> None:
 
 
 if __name__ == "__main__":
-    # LLM haberleri: sabah 07:00, akşam 18:00
-    schedule.every().minute.do(run_if_istanbul_time, target_hour=7)
-    schedule.every().minute.do(run_if_istanbul_time, target_hour=18)
+    # LLM haberleri: config'den saatleri al
+    schedule.every().minute.do(run_if_istanbul_time, target_hour=_CFG["news"]["morning_hour"])
+    schedule.every().minute.do(run_if_istanbul_time, target_hour=_CFG["news"]["evening_hour"])
 
-    # YouTube takibi: her 8 saatte bir
-    schedule.every(8).hours.do(run_youtube_tracker)
+    # YouTube takibi: config'den interval al
+    schedule.every(_CFG["youtube"]["check_interval_hours"]).hours.do(run_youtube_tracker)
 
     logger.info("Zamanlayici basladi.")
     logger.info("LLM haberleri: 07:00 ve 18:00 Istanbul")

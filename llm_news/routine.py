@@ -14,22 +14,16 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 ISTANBUL_TZ = pytz.timezone("Europe/Istanbul")
-
-RSS_FEEDS = [
-    "https://news.google.com/rss/search?q=Claude+GPT+Gemini+Anthropic+OpenAI+LLM&hl=en-US&gl=US&ceid=US:en",
-    "https://news.google.com/rss/search?q=yapay+zeka+LLM+Claude+GPT+Gemini&hl=tr&gl=TR&ceid=TR:tr",
-    "https://venturebeat.com/category/ai/feed/",
-    "https://techcrunch.com/category/artificial-intelligence/feed/",
-]
-
-KEYWORDS = [
-    "llm", "large language model", "claude", "chatgpt", "gpt-4", "gpt-5", "gpt-6",
-    "gemini", "anthropic", "openai", "deepmind", "mistral", "llama", "meta ai",
-    "generative ai", "yapay zeka", "language model", "foundation model", "ai model",
-]
-
-MAX_STORIES = 10
 HEADERS = {"User-Agent": "Mozilla/5.0 (LLM-News-Bot/1.0)"}
+
+# Config dosyasını yükle
+_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.json")
+with open(_CONFIG_PATH) as _f:
+    _CFG = json.load(_f)
+
+RSS_FEEDS = _CFG["news"]["feeds"]
+KEYWORDS = _CFG["news"]["keywords"]
+MAX_STORIES = _CFG["news"]["max_stories"]
 
 
 # ── RSS ──────────────────────────────────────────────────────────────────────
