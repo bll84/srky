@@ -1,9 +1,7 @@
 import json
 import logging
 import os
-import time
 import urllib.error
-import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
@@ -34,14 +32,14 @@ MAX_STORIES = 10
 HEADERS = {"User-Agent": "Mozilla/5.0 (LLM-News-Bot/1.0)"}
 
 
+# ── RSS ──────────────────────────────────────────────────────────────────────
+
 def _fetch_rss(url: str) -> list[dict]:
-    """Fetch and parse a single RSS feed. Returns list of items."""
     try:
         req = urllib.request.Request(url, headers=HEADERS)
         with urllib.request.urlopen(req, timeout=10) as resp:
             raw = resp.read()
         root = ET.fromstring(raw)
-        ns = {"media": "http://search.yahoo.com/mrss/"}
         channel = root.find("channel")
         if channel is None:
             return []
@@ -55,248 +53,177 @@ def _fetch_rss(url: str) -> list[dict]:
                 date = parsedate_to_datetime(pub_date).astimezone(timezone.utc)
             except Exception:
                 date = datetime.now(timezone.utc)
-            items.append({
-                "title": title,
-                "link": link,
-                "source": feed_title,
-                "date": date,
-            })
+            items.append({"title": title, "link": link, "source": feed_title, "date": date})
         return items
     except Exception as e:
         logger.warning("RSS alinamadi %s: %s", url, e)
         return []
 
 
-def _is_relevant(title: str) -> bool:
-    t = title.lower()
-    return any(kw in t for kw in KEYWORDS)
-
-
 def fetch_llm_news() -> list[dict]:
-    """Fetch LLM news from RSS feeds. Returns up to MAX_STORIES sorted by date."""
     seen_links: set[str] = set()
     stories: list[dict] = []
-
     for feed_url in RSS_FEEDS:
         for item in _fetch_rss(feed_url):
             if item["link"] in seen_links:
                 continue
-            if not _is_relevant(item["title"]):
+            if not any(kw in item["title"].lower() for kw in KEYWORDS):
                 continue
             seen_links.add(item["link"])
             stories.append(item)
-
     stories.sort(key=lambda x: x["date"], reverse=True)
     return stories[:MAX_STORIES]
 
 
-def _gemini_call(prompt: str, max_tokens: int = 2048) -> str:
-    """Make a single Gemini API call. Returns response text."""
+# ── Gemini (tek çağrı) ───────────────────────────────────────────────────────
+
+def _gemini_process_all(stories: list[dict]) -> dict:
+    """
+    Tek Gemini çağrısıyla:
+    - Başlıkları Türkçe'ye çevirir
+    - Her haber için içgörü üretir
+    - Kişisel fayda + proje fikirleri üretir
+    JSON döndürür.
+    """
     api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
-        return ""
+        return {"stories": [], "personal": ""}
+
+    story_list = "\n".join(f"{i+1}. {s['title']}" for i, s in enumerate(stories))
+
+    prompt = f"""Aşağıdaki yapay zeka/LLM haber başlıkları için JSON formatında yanıt ver.
+
+Haberler:
+{story_list}
+
+Şu JSON yapısını döndür:
+{{
+  "stories": [
+    {{
+      "baslik": "Türkçe başlık",
+      "icgoru": "💡 Ne anlama geliyor (1 cümle)\\n✅ • Yapabileceklerin (2-3 madde)"
+    }}
+  ],
+  "fayda": "FAYDA:\\n• madde 1\\n• madde 2\\n• madde 3",
+  "proje": "PROJE:\\n• Proje fikri — tahmini maliyet\\n• Proje fikri — tahmini maliyet\\n• Proje fikri — tahmini maliyet"
+}}
+
+Kurallar:
+- stories dizisi haberlerin sırasıyla eşleşmeli
+- Tüm metinler Türkçe olmalı
+- Sadece JSON döndür, başka hiçbir şey yazma"""
+
     payload = json.dumps({
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.4, "maxOutputTokens": max_tokens},
+        "generationConfig": {
+            "temperature": 0.4,
+            "maxOutputTokens": 4096,
+            "responseMimeType": "application/json",
+        },
     }).encode()
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
-    req = urllib.request.Request(
-        url, data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        data = json.loads(resp.read())
-    return data["candidates"][0]["content"]["parts"][0]["text"]
 
-
-def _get_gemini_insights(stories: list[dict]) -> dict[str, str]:
-    """Use Gemini to generate Turkish insights for each story. Returns {title: insight}."""
-    if not os.environ.get("GEMINI_API_KEY"):
-        return {}
-
-    titles = "\n".join(f"{i+1}. {s['title']}" for i, s in enumerate(stories))
-    prompt = (
-        "Aşağıdaki yapay zeka ve LLM haber başlıklarının her biri için Türkçe olarak şunu yaz:\n"
-        "💡 Ne anlama geliyor? (1 kısa cümle)\n"
-        "✅ Sen ne yapabilirsin? (2-3 kısa madde, gerçekten uygulanabilir)\n\n"
-        "Her haber için şu formatı kullan:\n"
-        "HABER [numara]:\n💡 ...\n✅ • ...\n✅ • ...\n\n"
-        f"Haberler:\n{titles}"
-    )
     try:
-        text = _gemini_call(prompt, max_tokens=2048)
-        insights = {}
-        for i, story in enumerate(stories, 1):
-            marker = f"HABER {i}:"
-            next_marker = f"HABER {i+1}:"
-            start = text.find(marker)
-            if start == -1:
-                continue
-            end = text.find(next_marker, start)
-            block = text[start + len(marker):end].strip() if end != -1 else text[start + len(marker):].strip()
-            insights[story["title"]] = block
-        return insights
+        req = urllib.request.Request(
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=45) as resp:
+            data = json.loads(resp.read())
+        raw = data["candidates"][0]["content"]["parts"][0]["text"]
+        return json.loads(raw)
     except Exception as e:
-        logger.warning("Gemini icgorusu alinamadi: %s", e)
-        return {}
+        logger.warning("Gemini isleme hatasi: %s", e)
+        return {"stories": [], "personal": ""}
 
 
-def _get_gemini_personal_summary(stories: list[dict]) -> str:
-    """Generate a personal benefit + low-cost project ideas summary from today's news."""
-    if not os.environ.get("GEMINI_API_KEY"):
-        return ""
-
-    titles = "\n".join(f"• {s['title']}" for s in stories)
-    prompt = (
-        "Aşağıdaki yapay zeka haberleri, bireysel bir kullanıcı için Türkçe olarak analiz et.\n\n"
-        "Şu formatı kullan (başka hiçbir şey yazma):\n\n"
-        "FAYDA:\n"
-        "• [bugünkü haberlere göre bireysel kullanıcının elde edebileceği somut fayda - 3 madde]\n\n"
-        "PROJE:\n"
-        "• [düşük maliyetli, uygulanabilir proje fikri] — [tahmini maliyet]\n"
-        "• [düşük maliyetli, uygulanabilir proje fikri] — [tahmini maliyet]\n"
-        "• [düşük maliyetli, uygulanabilir proje fikri] — [tahmini maliyet]\n\n"
-        f"Haberler:\n{titles}"
-    )
-    try:
-        return _gemini_call(prompt, max_tokens=512)
-    except Exception as e:
-        logger.warning("Gemini ozet alinamadi: %s", e)
-        return ""
-
+# ── Pi Durumu ────────────────────────────────────────────────────────────────
 
 def get_pi_status() -> str:
-    """Collect Raspberry Pi system info. Returns formatted Telegram HTML block."""
-    import shutil
-    import socket
+    import shutil, socket
     lines = ["🖥️ <b>Pi Durumu</b>"]
     try:
-        temp_raw = open("/sys/class/thermal/thermal_zone0/temp").read().strip()
-        temp = int(temp_raw) / 1000
+        temp = int(open("/sys/class/thermal/thermal_zone0/temp").read().strip()) / 1000
         icon = "🔴" if temp > 70 else "🟡" if temp > 55 else "🟢"
         lines.append(f"{icon} Sıcaklık: {temp:.0f}°C")
     except Exception:
         pass
     try:
-        meminfo = {}
-        for line in open("/proc/meminfo"):
-            k, v = line.split(":")
-            meminfo[k.strip()] = int(v.strip().split()[0])
-        total = meminfo["MemTotal"]
-        available = meminfo["MemAvailable"]
-        used_pct = int((total - available) / total * 100)
-        used_mb = (total - available) // 1024
-        total_mb = total // 1024
-        lines.append(f"💾 RAM: %{used_pct} ({used_mb}MB / {total_mb}MB)")
+        meminfo = {k.strip(): int(v.strip().split()[0])
+                   for line in open("/proc/meminfo")
+                   for k, v in [line.split(":", 1)]}
+        total, avail = meminfo["MemTotal"], meminfo["MemAvailable"]
+        lines.append(f"💾 RAM: %{int((total-avail)/total*100)} ({(total-avail)//1024}MB / {total//1024}MB)")
     except Exception:
         pass
     try:
-        usage = shutil.disk_usage("/")
-        used_gb = usage.used / 1e9
-        total_gb = usage.total / 1e9
-        pct = int(usage.used / usage.total * 100)
-        lines.append(f"💿 Disk: %{pct} ({used_gb:.1f}GB / {total_gb:.1f}GB)")
+        u = shutil.disk_usage("/")
+        lines.append(f"💿 Disk: %{int(u.used/u.total*100)} ({u.used/1e9:.1f}GB / {u.total/1e9:.1f}GB)")
     except Exception:
         pass
     try:
-        uptime_sec = float(open("/proc/uptime").read().split()[0])
-        days = int(uptime_sec // 86400)
-        hours = int((uptime_sec % 86400) // 3600)
-        minutes = int((uptime_sec % 3600) // 60)
-        if days > 0:
-            uptime_str = f"{days}g {hours}sa"
-        elif hours > 0:
-            uptime_str = f"{hours}sa {minutes}dk"
-        else:
-            uptime_str = f"{minutes}dk"
-        lines.append(f"⏱️ Çalışma: {uptime_str}")
+        sec = float(open("/proc/uptime").read().split()[0])
+        d, h, m = int(sec//86400), int(sec%86400//3600), int(sec%3600//60)
+        lines.append(f"⏱️ Çalışma: {f'{d}g {h}sa' if d else f'{h}sa {m}dk' if h else f'{m}dk'}")
     except Exception:
         pass
     try:
-        ip = socket.gethostbyname(socket.gethostname())
-        lines.append(f"🌐 IP: {ip}")
+        lines.append(f"🌐 IP: {socket.gethostbyname(socket.gethostname())}")
     except Exception:
         pass
     return "\n".join(lines)
 
 
-def _translate_to_turkish(text: str) -> str:
-    """Translate text to Turkish using MyMemory free API."""
-    try:
-        params = urllib.parse.urlencode({"q": text, "langpair": "en|tr"})
-        url = f"https://api.mymemory.translated.net/get?{params}"
-        req = urllib.request.Request(url, headers=HEADERS)
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            data = json.loads(resp.read())
-        translated = data.get("responseData", {}).get("translatedText", "")
-        if translated and translated.upper() != text.upper():
-            return translated
-    except Exception as e:
-        logger.debug("Ceviri basarisiz: %s", e)
-    return text
-
+# ── Telegram ─────────────────────────────────────────────────────────────────
 
 def format_for_telegram(stories: list[dict], header: str) -> str:
-    """Format stories as Telegram-compatible HTML with Turkish translation and Gemini insights."""
     if not stories:
         return f"<b>{header}</b>\n\nBugün LLM haberi bulunamadı."
 
     def esc(s: str) -> str:
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-    # Tüm haberler için tek seferde Gemini içgörüsü al
-    insights = _get_gemini_insights(stories)
-    time.sleep(1)  # Gemini rate limit için bekle
-    personal_summary = _get_gemini_personal_summary(stories)
+    # Tek Gemini çağrısı — çeviri + içgörü + özet
+    gemini = _gemini_process_all(stories)
+    gemini_stories = gemini.get("stories", [])
 
     lines = [f"<b>{header}</b>"]
     for i, s in enumerate(stories, 1):
-        title = s["title"]
-        # Başlık Türkçe karakter içermiyorsa çevir
-        if not any(tr_char in title for tr_char in "çğışöüÇĞİŞÖÜ"):
-            title = _translate_to_turkish(title)
-            time.sleep(0.3)  # API rate limit için kısa bekleme
+        g = gemini_stories[i-1] if i-1 < len(gemini_stories) else {}
+        title = g.get("baslik") or s["title"]
+        insight = g.get("icgoru", "")
         date_str = s["date"].astimezone(ISTANBUL_TZ).strftime("%d %b %H:%M")
-        insight = insights.get(s["title"], "")
-        block = (
-            f"\n<b>{i}. {esc(title)}</b>\n"
-            f"<i>{esc(s['source'])} — {date_str}</i>"
-        )
+        block = f"\n<b>{i}. {esc(title)}</b>\n<i>{esc(s['source'])} — {date_str}</i>"
         if insight:
             block += f"\n{esc(insight)}"
         block += f'\n<a href="{s["link"]}">Devamını oku →</a>'
         lines.append(block)
 
-    # Kişisel özet bölümü
-    if personal_summary:
+    fayda = gemini.get("fayda", "")
+    proje = gemini.get("proje", "")
+    if fayda or proje:
         lines.append(
             f"\n\n<b>━━━━━━━━━━━━━━━</b>\n"
             f"<b>💰 BUGÜN SANA NE KAZANDIRIR?</b>\n\n"
-            f"{esc(personal_summary)}"
+            f"{esc(fayda)}\n\n{esc(proje)}"
         )
 
-    # Pi durum raporu
-    pi_status = get_pi_status()
-    if pi_status:
-        lines.append(f"\n\n<b>━━━━━━━━━━━━━━━</b>\n{pi_status}")
+    pi = get_pi_status()
+    if pi:
+        lines.append(f"\n\n<b>━━━━━━━━━━━━━━━</b>\n{pi}")
 
     return "\n".join(lines)
 
 
 def _telegram_send(token: str, chat_id: str, text: str) -> None:
-    """Send a single Telegram message (max 4096 chars)."""
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = json.dumps({
-        "chat_id": chat_id,
-        "text": text,
-        "parse_mode": "HTML",
-        "disable_web_page_preview": True,
+        "chat_id": chat_id, "text": text,
+        "parse_mode": "HTML", "disable_web_page_preview": True,
     }).encode()
     req = urllib.request.Request(
-        url, data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
+        f"https://api.telegram.org/bot{token}/sendMessage",
+        data=payload, headers={"Content-Type": "application/json"}, method="POST",
     )
     with urllib.request.urlopen(req, timeout=15) as resp:
         result = json.loads(resp.read())
@@ -305,15 +232,11 @@ def _telegram_send(token: str, chat_id: str, text: str) -> None:
 
 
 def send_telegram(text: str) -> None:
-    """Send to Telegram, chunking if > 4096 chars."""
     token = os.environ["TELEGRAM_BOT_TOKEN"]
     chat_id = os.environ["TELEGRAM_CHAT_ID"]
-
     if len(text) <= 4096:
         _telegram_send(token, chat_id, text)
         return
-
-    # Bölümlere ayır — her haber bloğu "\n\n" ile ayrılıyor
     chunks, current = [], ""
     for block in text.split("\n\n"):
         candidate = current + "\n\n" + block if current else block
@@ -325,18 +248,17 @@ def send_telegram(text: str) -> None:
             current = candidate
     if current:
         chunks.append(current)
-
     for chunk in chunks:
         _telegram_send(token, chat_id, chunk)
 
 
+# ── Ana Rutin ─────────────────────────────────────────────────────────────────
+
 def run_news_routine() -> None:
-    """Orchestrate fetch + format + send. Never crashes the scheduler."""
     now = datetime.now(ISTANBUL_TZ)
     slot = "Sabah" if now.hour < 12 else "Aksam"
     header = f"LLM Haber Ozeti — {now.strftime('%d %B %Y')} ({slot})"
-
-    logger.info("LLM haber rutini basliyor: %s", header)
+    logger.info("Baslıyor: %s", header)
     try:
         stories = fetch_llm_news()
         logger.info("%d haber bulundu", len(stories))
