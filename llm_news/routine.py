@@ -90,6 +90,55 @@ def fetch_llm_news() -> list[dict]:
     return stories[:MAX_STORIES]
 
 
+def _get_gemini_insights(stories: list[dict]) -> dict[str, str]:
+    """Use Gemini to generate Turkish insights for each story. Returns {title: insight}."""
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        return {}
+
+    titles = "\n".join(f"{i+1}. {s['title']}" for i, s in enumerate(stories))
+    prompt = (
+        "Aşağıdaki yapay zeka ve LLM haber başlıklarının her biri için Türkçe olarak şunu yaz:\n"
+        "💡 Ne anlama geliyor? (1 kısa cümle)\n"
+        "✅ Sen ne yapabilirsin? (2-3 kısa madde, gerçekten uygulanabilir)\n\n"
+        "Her haber için şu formatı kullan:\n"
+        "HABER [numara]:\n💡 ...\n✅ • ...\n✅ • ...\n\n"
+        f"Haberler:\n{titles}"
+    )
+
+    payload = json.dumps({
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.4, "maxOutputTokens": 2048},
+    }).encode()
+
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        req = urllib.request.Request(
+            url, data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read())
+        text = data["candidates"][0]["content"]["parts"][0]["text"]
+
+        # Her haberin içgörüsünü ayır
+        insights = {}
+        for i, story in enumerate(stories, 1):
+            marker = f"HABER {i}:"
+            next_marker = f"HABER {i+1}:"
+            start = text.find(marker)
+            if start == -1:
+                continue
+            end = text.find(next_marker, start)
+            block = text[start + len(marker):end].strip() if end != -1 else text[start + len(marker):].strip()
+            insights[story["title"]] = block
+        return insights
+    except Exception as e:
+        logger.warning("Gemini icgorusu alinamadi: %s", e)
+        return {}
+
+
 def _translate_to_turkish(text: str) -> str:
     """Translate text to Turkish using MyMemory free API."""
     try:
@@ -107,12 +156,15 @@ def _translate_to_turkish(text: str) -> str:
 
 
 def format_for_telegram(stories: list[dict], header: str) -> str:
-    """Format stories as Telegram-compatible HTML, translating titles to Turkish."""
+    """Format stories as Telegram-compatible HTML with Turkish translation and Gemini insights."""
     if not stories:
         return f"<b>{header}</b>\n\nBugün LLM haberi bulunamadı."
 
     def esc(s: str) -> str:
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    # Tüm haberler için tek seferde Gemini içgörüsü al
+    insights = _get_gemini_insights(stories)
 
     lines = [f"<b>{header}</b>"]
     for i, s in enumerate(stories, 1):
@@ -122,11 +174,15 @@ def format_for_telegram(stories: list[dict], header: str) -> str:
             title = _translate_to_turkish(title)
             time.sleep(0.3)  # API rate limit için kısa bekleme
         date_str = s["date"].astimezone(ISTANBUL_TZ).strftime("%d %b %H:%M")
-        lines.append(
+        insight = insights.get(s["title"], "")
+        block = (
             f"\n<b>{i}. {esc(title)}</b>\n"
-            f"<i>{esc(s['source'])} — {date_str}</i>\n"
-            f'<a href="{s["link"]}">Devamını oku →</a>'
+            f"<i>{esc(s['source'])} — {date_str}</i>"
         )
+        if insight:
+            block += f"\n{esc(insight)}"
+        block += f'\n<a href="{s["link"]}">Devamını oku →</a>'
+        lines.append(block)
 
     return "\n".join(lines)
 
