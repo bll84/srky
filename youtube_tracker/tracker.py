@@ -68,11 +68,10 @@ def _fetch_channel_videos(channel_id: str) -> list[dict]:
     for entry in root.findall("atom:entry", ns):
         video_id = entry.findtext("yt:videoId", "", ns)
         title = entry.findtext("atom:title", "", ns)
-        link = entry.findtext("atom:link[@rel='alternate']", "", ns)
-        if not link:
-            link_el = entry.find("atom:link", ns)
-            link = link_el.get("href", "") if link_el is not None else ""
+        link_el = entry.find("atom:link", ns)
+        link = link_el.get("href", "") if link_el is not None else ""
         published = entry.findtext("atom:published", "", ns)
+        description = entry.findtext("media:group/media:description", "", ns)
         try:
             date = datetime.fromisoformat(published.replace("Z", "+00:00"))
         except Exception:
@@ -84,8 +83,52 @@ def _fetch_channel_videos(channel_id: str) -> list[dict]:
                 "link": f"https://www.youtube.com/watch?v={video_id}",
                 "channel": channel_name,
                 "date": date,
+                "description": description,
             })
     return videos
+
+
+def _extract_timestamps(description: str) -> list[str]:
+    """Extract timestamp lines from video description."""
+    lines = description.split("\n")
+    pattern = re.compile(r"(\d{1,2}:\d{2}(?::\d{2})?)\s+(.+)")
+    timestamps = []
+    for line in lines:
+        m = pattern.search(line.strip())
+        if m:
+            timestamps.append(f"{m.group(1)} {m.group(2).strip()}")
+    return timestamps[:15]  # max 15 zaman damgası
+
+
+def _gemini_summarize(title: str, description: str) -> str:
+    """Use Gemini to generate a short Turkish summary of the video."""
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key or not description.strip():
+        return ""
+
+    prompt = (
+        f"YouTube videosu:\nBaşlık: {title}\n\nAçıklama:\n{description[:1500]}\n\n"
+        "Bu videoyu Türkçe olarak 2-3 cümleyle özetle. "
+        "Ne anlatıyor, izleyici ne öğrenir? "
+        "Sadece özeti yaz, başka bir şey ekleme."
+    )
+    payload = json.dumps({
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 256},
+    }).encode()
+    try:
+        req = urllib.request.Request(
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            data = json.loads(resp.read())
+        return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+    except Exception as e:
+        logger.warning("Gemini ozet hatasi: %s", e)
+        return ""
 
 
 def _telegram_send(text: str) -> None:
@@ -109,6 +152,37 @@ def _telegram_send(text: str) -> None:
         raise RuntimeError(f"Telegram hatasi: {result}")
 
 
+def _build_message(video: dict) -> str:
+    """Build Telegram message for a new video."""
+    date_str = video["date"].astimezone(ISTANBUL_TZ).strftime("%d %b %H:%M")
+
+    def esc(s: str) -> str:
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    lines = [
+        f"🎬 <b>Yeni Video!</b>",
+        f"",
+        f"<b>{esc(video['channel'])}</b>",
+        f"<b>{esc(video['title'])}</b>",
+        f"<i>{date_str}</i>",
+    ]
+
+    # Gemini özeti
+    summary = _gemini_summarize(video["title"], video.get("description", ""))
+    if summary:
+        lines.append(f"\n📝 <b>Özet:</b>\n{esc(summary)}")
+
+    # Zaman damgaları
+    timestamps = _extract_timestamps(video.get("description", ""))
+    if timestamps:
+        lines.append(f"\n⏱️ <b>İçerik:</b>")
+        for ts in timestamps:
+            lines.append(f"  {esc(ts)}")
+
+    lines.append(f"\n<a href=\"{video['link']}\">▶️ İzle →</a>")
+    return "\n".join(lines)
+
+
 def run_youtube_tracker() -> None:
     """Check all channels for new videos and send Telegram notifications."""
     state = _load_state()
@@ -122,14 +196,7 @@ def run_youtube_tracker() -> None:
             new_videos = [v for v in videos if v["id"] not in seen]
 
             for video in reversed(new_videos):  # Eskiden yeniye gönder
-                date_str = video["date"].astimezone(ISTANBUL_TZ).strftime("%d %b %H:%M")
-                msg = (
-                    f"🎬 <b>Yeni Video!</b>\n\n"
-                    f"<b>{video['channel']}</b>\n"
-                    f"{video['title']}\n\n"
-                    f"<i>{date_str}</i>\n"
-                    f'<a href="{video["link"]}">İzle →</a>'
-                )
+                msg = _build_message(video)
                 _telegram_send(msg)
                 logger.info("Yeni video bildirimi: %s", video["title"])
                 new_videos_found = True
