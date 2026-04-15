@@ -1,13 +1,15 @@
 """
-LLM News Email Routine — Scheduler Entry Point
+Pi Rutinleri — Zamanlayıcı
 
-Runs the LLM news digest twice daily at 07:00 and 18:00 Istanbul time.
+- LLM Haber Özeti: 07:00 ve 18:00 (Istanbul)
+- YouTube Kanal Takibi: her saat başı
 
 Usage:
     python run.py
 
-For a one-off test run:
+Tek seferlik test:
     python -c "from llm_news.routine import run_news_routine; run_news_routine()"
+    python -c "from youtube_tracker.tracker import run_youtube_tracker; run_youtube_tracker()"
 """
 
 import logging
@@ -29,6 +31,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 from llm_news.routine import run_news_routine  # noqa: E402 (after logging setup)
+from youtube_tracker.tracker import run_youtube_tracker  # noqa: E402
 
 ISTANBUL_TZ = pytz.timezone("Europe/Istanbul")
 
@@ -46,12 +49,19 @@ def run_if_istanbul_time(target_hour: int) -> None:
 
 
 if __name__ == "__main__":
+    # LLM haberleri: sabah 07:00, akşam 18:00
     schedule.every().minute.do(run_if_istanbul_time, target_hour=7)
     schedule.every().minute.do(run_if_istanbul_time, target_hour=18)
 
-    logger.info(
-        "Zamanlayici basladi. Istanbul saatiyle 07:00 ve 18:00'de calisacak."
-    )
+    # YouTube takibi: her saat başı
+    schedule.every().hour.do(run_youtube_tracker)
+
+    logger.info("Zamanlayici basladi.")
+    logger.info("LLM haberleri: 07:00 ve 18:00 Istanbul")
+    logger.info("YouTube takibi: her saat basi")
+
+    # İlk çalıştırmada YouTube'u hemen kontrol et
+    run_youtube_tracker()
 
     while True:
         schedule.run_pending()
