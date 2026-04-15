@@ -166,6 +166,61 @@ def _get_gemini_personal_summary(stories: list[dict]) -> str:
         return ""
 
 
+def get_pi_status() -> str:
+    """Collect Raspberry Pi system info. Returns formatted Telegram HTML block."""
+    import shutil
+    import socket
+    lines = ["🖥️ <b>Pi Durumu</b>"]
+    try:
+        temp_raw = open("/sys/class/thermal/thermal_zone0/temp").read().strip()
+        temp = int(temp_raw) / 1000
+        icon = "🔴" if temp > 70 else "🟡" if temp > 55 else "🟢"
+        lines.append(f"{icon} Sıcaklık: {temp:.0f}°C")
+    except Exception:
+        pass
+    try:
+        meminfo = {}
+        for line in open("/proc/meminfo"):
+            k, v = line.split(":")
+            meminfo[k.strip()] = int(v.strip().split()[0])
+        total = meminfo["MemTotal"]
+        available = meminfo["MemAvailable"]
+        used_pct = int((total - available) / total * 100)
+        used_mb = (total - available) // 1024
+        total_mb = total // 1024
+        lines.append(f"💾 RAM: %{used_pct} ({used_mb}MB / {total_mb}MB)")
+    except Exception:
+        pass
+    try:
+        usage = shutil.disk_usage("/")
+        used_gb = usage.used / 1e9
+        total_gb = usage.total / 1e9
+        pct = int(usage.used / usage.total * 100)
+        lines.append(f"💿 Disk: %{pct} ({used_gb:.1f}GB / {total_gb:.1f}GB)")
+    except Exception:
+        pass
+    try:
+        uptime_sec = float(open("/proc/uptime").read().split()[0])
+        days = int(uptime_sec // 86400)
+        hours = int((uptime_sec % 86400) // 3600)
+        minutes = int((uptime_sec % 3600) // 60)
+        if days > 0:
+            uptime_str = f"{days}g {hours}sa"
+        elif hours > 0:
+            uptime_str = f"{hours}sa {minutes}dk"
+        else:
+            uptime_str = f"{minutes}dk"
+        lines.append(f"⏱️ Çalışma: {uptime_str}")
+    except Exception:
+        pass
+    try:
+        ip = socket.gethostbyname(socket.gethostname())
+        lines.append(f"🌐 IP: {ip}")
+    except Exception:
+        pass
+    return "\n".join(lines)
+
+
 def _translate_to_turkish(text: str) -> str:
     """Translate text to Turkish using MyMemory free API."""
     try:
@@ -220,6 +275,11 @@ def format_for_telegram(stories: list[dict], header: str) -> str:
             f"<b>💰 BUGÜN SANA NE KAZANDIRIR?</b>\n\n"
             f"{esc(personal_summary)}"
         )
+
+    # Pi durum raporu
+    pi_status = get_pi_status()
+    if pi_status:
+        lines.append(f"\n\n<b>━━━━━━━━━━━━━━━</b>\n{pi_status}")
 
     return "\n".join(lines)
 
