@@ -1,0 +1,15 @@
+[Unit]
+Description=LLM Haber Ozeti — Telegram Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/srky
+ExecStart=/usr/bin/python3 /home/pi/srky/run.py
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
