@@ -53,8 +53,8 @@ if __name__ == "__main__":
     schedule.every().minute.do(run_if_istanbul_time, target_hour=7)
     schedule.every().minute.do(run_if_istanbul_time, target_hour=18)
 
-    # YouTube takibi: her saat başı
-    schedule.every().hour.do(run_youtube_tracker)
+    # YouTube takibi: her 8 saatte bir
+    schedule.every(8).hours.do(run_youtube_tracker)
 
     logger.info("Zamanlayici basladi.")
     logger.info("LLM haberleri: 07:00 ve 18:00 Istanbul")
