@@ -90,10 +90,29 @@ def fetch_llm_news() -> list[dict]:
     return stories[:MAX_STORIES]
 
 
-def _get_gemini_insights(stories: list[dict]) -> dict[str, str]:
-    """Use Gemini to generate Turkish insights for each story. Returns {title: insight}."""
+def _gemini_call(prompt: str, max_tokens: int = 2048) -> str:
+    """Make a single Gemini API call. Returns response text."""
     api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
+        return ""
+    payload = json.dumps({
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.4, "maxOutputTokens": max_tokens},
+    }).encode()
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+    req = urllib.request.Request(
+        url, data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        data = json.loads(resp.read())
+    return data["candidates"][0]["content"]["parts"][0]["text"]
+
+
+def _get_gemini_insights(stories: list[dict]) -> dict[str, str]:
+    """Use Gemini to generate Turkish insights for each story. Returns {title: insight}."""
+    if not os.environ.get("GEMINI_API_KEY"):
         return {}
 
     titles = "\n".join(f"{i+1}. {s['title']}" for i, s in enumerate(stories))
@@ -105,24 +124,8 @@ def _get_gemini_insights(stories: list[dict]) -> dict[str, str]:
         "HABER [numara]:\n💡 ...\n✅ • ...\n✅ • ...\n\n"
         f"Haberler:\n{titles}"
     )
-
-    payload = json.dumps({
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.4, "maxOutputTokens": 2048},
-    }).encode()
-
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
-        req = urllib.request.Request(
-            url, data=payload,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            data = json.loads(resp.read())
-        text = data["candidates"][0]["content"]["parts"][0]["text"]
-
-        # Her haberin içgörüsünü ayır
+        text = _gemini_call(prompt, max_tokens=2048)
         insights = {}
         for i, story in enumerate(stories, 1):
             marker = f"HABER {i}:"
@@ -137,6 +140,30 @@ def _get_gemini_insights(stories: list[dict]) -> dict[str, str]:
     except Exception as e:
         logger.warning("Gemini icgorusu alinamadi: %s", e)
         return {}
+
+
+def _get_gemini_personal_summary(stories: list[dict]) -> str:
+    """Generate a personal benefit + low-cost project ideas summary from today's news."""
+    if not os.environ.get("GEMINI_API_KEY"):
+        return ""
+
+    titles = "\n".join(f"• {s['title']}" for s in stories)
+    prompt = (
+        "Aşağıdaki yapay zeka haberleri, bireysel bir kullanıcı için Türkçe olarak analiz et.\n\n"
+        "Şu formatı kullan (başka hiçbir şey yazma):\n\n"
+        "FAYDA:\n"
+        "• [bugünkü haberlere göre bireysel kullanıcının elde edebileceği somut fayda - 3 madde]\n\n"
+        "PROJE:\n"
+        "• [düşük maliyetli, uygulanabilir proje fikri] — [tahmini maliyet]\n"
+        "• [düşük maliyetli, uygulanabilir proje fikri] — [tahmini maliyet]\n"
+        "• [düşük maliyetli, uygulanabilir proje fikri] — [tahmini maliyet]\n\n"
+        f"Haberler:\n{titles}"
+    )
+    try:
+        return _gemini_call(prompt, max_tokens=512)
+    except Exception as e:
+        logger.warning("Gemini ozet alinamadi: %s", e)
+        return ""
 
 
 def _translate_to_turkish(text: str) -> str:
@@ -165,6 +192,8 @@ def format_for_telegram(stories: list[dict], header: str) -> str:
 
     # Tüm haberler için tek seferde Gemini içgörüsü al
     insights = _get_gemini_insights(stories)
+    time.sleep(1)  # Gemini rate limit için bekle
+    personal_summary = _get_gemini_personal_summary(stories)
 
     lines = [f"<b>{header}</b>"]
     for i, s in enumerate(stories, 1):
@@ -183,6 +212,14 @@ def format_for_telegram(stories: list[dict], header: str) -> str:
             block += f"\n{esc(insight)}"
         block += f'\n<a href="{s["link"]}">Devamını oku →</a>'
         lines.append(block)
+
+    # Kişisel özet bölümü
+    if personal_summary:
+        lines.append(
+            f"\n\n<b>━━━━━━━━━━━━━━━</b>\n"
+            f"<b>💰 BUGÜN SANA NE KAZANDIRIR?</b>\n\n"
+            f"{esc(personal_summary)}"
+        )
 
     return "\n".join(lines)
 
