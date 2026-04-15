@@ -1,7 +1,9 @@
 import json
 import logging
 import os
+import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
@@ -88,8 +90,24 @@ def fetch_llm_news() -> list[dict]:
     return stories[:MAX_STORIES]
 
 
+def _translate_to_turkish(text: str) -> str:
+    """Translate text to Turkish using MyMemory free API."""
+    try:
+        params = urllib.parse.urlencode({"q": text, "langpair": "en|tr"})
+        url = f"https://api.mymemory.translated.net/get?{params}"
+        req = urllib.request.Request(url, headers=HEADERS)
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read())
+        translated = data.get("responseData", {}).get("translatedText", "")
+        if translated and translated.upper() != text.upper():
+            return translated
+    except Exception as e:
+        logger.debug("Ceviri basarisiz: %s", e)
+    return text
+
+
 def format_for_telegram(stories: list[dict], header: str) -> str:
-    """Format stories as Telegram-compatible HTML."""
+    """Format stories as Telegram-compatible HTML, translating titles to Turkish."""
     if not stories:
         return f"<b>{header}</b>\n\nBugün LLM haberi bulunamadı."
 
@@ -98,9 +116,14 @@ def format_for_telegram(stories: list[dict], header: str) -> str:
 
     lines = [f"<b>{header}</b>"]
     for i, s in enumerate(stories, 1):
+        title = s["title"]
+        # Başlık Türkçe değilse çevir
+        if not any(tr_char in title for tr_char in "çğışöüÇĞİŞÖÜ") and title.isascii():
+            title = _translate_to_turkish(title)
+            time.sleep(0.3)  # API rate limit için kısa bekleme
         date_str = s["date"].astimezone(ISTANBUL_TZ).strftime("%d %b %H:%M")
         lines.append(
-            f"\n<b>{i}. {esc(s['title'])}</b>\n"
+            f"\n<b>{i}. {esc(title)}</b>\n"
             f"<i>{esc(s['source'])} — {date_str}</i>\n"
             f'<a href="{s["link"]}">Devamını oku →</a>'
         )
