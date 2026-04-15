@@ -117,8 +117,8 @@ def format_for_telegram(stories: list[dict], header: str) -> str:
     lines = [f"<b>{header}</b>"]
     for i, s in enumerate(stories, 1):
         title = s["title"]
-        # Başlık Türkçe değilse çevir
-        if not any(tr_char in title for tr_char in "çğışöüÇĞİŞÖÜ") and title.isascii():
+        # Başlık Türkçe karakter içermiyorsa çevir
+        if not any(tr_char in title for tr_char in "çğışöüÇĞİŞÖÜ"):
             title = _translate_to_turkish(title)
             time.sleep(0.3)  # API rate limit için kısa bekleme
         date_str = s["date"].astimezone(ISTANBUL_TZ).strftime("%d %b %H:%M")
