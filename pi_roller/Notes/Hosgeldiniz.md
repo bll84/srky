@@ -1,8 +1,10 @@
-# Hosgeldiniz — Pi Vault
+# Hosgeldiniz — pi_roller
 
-Bu kasa **Raspberry Pi uzerinde kurulu Obsidian** icin acildi. Amac,
-Pi ile alakali notlari, servis kayitlarini ve proje dokumantasyonunu
-repo'daki diger vault'tan ayri tutmak.
+Bu kasanin adi **pi_roller**: Pi'de donen "roller / rutinler" fikrinden
+geliyor (haber ozeti, YouTube takibi, LED kontrol vb.). Raspberry Pi
+uzerinde kurulu Obsidian icin acildi; amac Pi ile alakali notlari,
+servis kayitlarini ve proje dokumantasyonunu repo'daki diger vault'tan
+ayri tutmak.
 
 ## Klasor Yapisi
 
@@ -32,4 +34,4 @@ repo'daki diger vault'tan ayri tutmak.
 Notlar arasinda baglanti: `[[Not Adi]]` seklinde yazin.
 
 ---
-Tags: #pi #vault #giris
+Tags: #pi #pi_roller #giris

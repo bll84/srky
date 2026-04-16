@@ -1,23 +1,24 @@
-# Pi Vault
+# pi_roller
 
-Raspberry Pi uzerinde kurulu Obsidian uygulamasi icin ayri bir vault.
+Raspberry Pi uzerinde kurulu Obsidian uygulamasi icin ayri bir kasa
+(vault). Ad, "Pi uzerinde calisan roller / rutinler" fikrinden geliyor.
 Repo root'undaki vault'tan bagimsiz calisir.
 
 ## Obsidian'da acma
 
 1. Obsidian'i acin → sag alt kose → **Open folder as vault**.
-2. `pi-vault/` klasorunu secin.
+2. `pi_roller/` klasorunu secin.
 3. `.obsidian/` config'i otomatik okunacaktir.
 
 ## Git ile senkron
 
-Vault bu repo icinde versiyonlanir:
+Kasa bu repo icinde versiyonlanir:
 
 ```bash
 cd ~/srky
 git pull
 # ... Obsidian'da notlari duzenleyin ...
-git add pi-vault
+git add pi_roller
 git commit -m "notes: gunluk not"
 git push
 ```
