@@ -1,0 +1,16 @@
+[Unit]
+Description=Pi Rutinleri — LLM Haberleri + YouTube Takibi
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bllsrky
+WorkingDirectory=/home/bllsrky/srky
+ExecStart=/home/bllsrky/venv/bin/python3 /home/bllsrky/srky/run.py
+Restart=on-failure
+RestartSec=30
+EnvironmentFile=/home/bllsrky/srky/.env
+
+[Install]
+WantedBy=multi-user.target
