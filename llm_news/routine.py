@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import time
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -16,6 +17,9 @@ logger = logging.getLogger(__name__)
 ISTANBUL_TZ = pytz.timezone("Europe/Istanbul")
 HEADERS = {"User-Agent": "Mozilla/5.0 (LLM-News-Bot/1.0)"}
 
+# Geçici hata sayılan ve yeniden denenen hata kodları
+_RETRIABLE_STATUS = {429, 500, 502, 503, 504}
+
 # Config dosyasını yükle
 _CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.json")
 with open(_CONFIG_PATH) as _f:
@@ -24,6 +28,66 @@ with open(_CONFIG_PATH) as _f:
 RSS_FEEDS = _CFG["news"]["feeds"]
 KEYWORDS = _CFG["news"]["keywords"]
 MAX_STORIES = _CFG["news"]["max_stories"]
+
+
+# ── HTTP retry + admin alert ─────────────────────────────────────────────────
+
+def _http_post_json(url: str, payload: bytes, timeout: int, retries: int = 3) -> dict:
+    """POST JSON; geçici hatada exponential backoff ile yeniden dener.
+
+    Retry koşulları: URLError (timeout/DNS/reset), 429/5xx HTTPError.
+    Kalıcı hatalarda (4xx vb.) ilk denemede istisna fırlatır.
+    """
+    req = urllib.request.Request(
+        url, data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    last_err: Exception | None = None
+    for attempt in range(1, retries + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            last_err = e
+            if e.code not in _RETRIABLE_STATUS:
+                raise
+            logger.warning("HTTP %s, deneme %d/%d: %s", e.code, attempt, retries, url)
+        except urllib.error.URLError as e:
+            last_err = e
+            logger.warning("Bağlantı hatası, deneme %d/%d: %s", attempt, retries, e)
+        if attempt < retries:
+            time.sleep(2 ** attempt)  # 2s, 4s, 8s
+    assert last_err is not None
+    raise last_err
+
+
+def _send_admin_alert(message: str) -> None:
+    """Kritik hata olduğunda admin chat'ine Telegram uyarısı yolla.
+
+    Uyarının kendisi başarısız olursa sessizce log'a düşer — aksi halde
+    alert loop'una girilir.
+    """
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    chat_id = os.environ.get("TELEGRAM_ADMIN_CHAT_ID") or os.environ.get("TELEGRAM_CHAT_ID", "")
+    if not token or not chat_id:
+        return
+    try:
+        payload = json.dumps({
+            "chat_id": chat_id,
+            "text": f"🚨 <b>Pi Rutinleri Uyarı</b>\n\n{message}",
+            "parse_mode": "HTML",
+            "disable_web_page_preview": True,
+        }).encode()
+        req = urllib.request.Request(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=10).read()
+    except Exception as e:
+        logger.error("Admin alert gönderilemedi: %s", e)
 
 
 # ── RSS ──────────────────────────────────────────────────────────────────────
@@ -115,21 +179,20 @@ Kurallar:
             "responseMimeType": "application/json",
         },
     }).encode()
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
 
     try:
-        req = urllib.request.Request(
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}",
-            data=payload,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=45) as resp:
-            data = json.loads(resp.read())
+        data = _http_post_json(url, payload, timeout=45)
         raw = data["candidates"][0]["content"]["parts"][0]["text"]
         return json.loads(raw)
     except Exception as e:
-        logger.warning("Gemini isleme hatasi: %s", e)
-        return {"stories": [], "personal": ""}
+        logger.error("Gemini işleme kalıcı hatası: %s", e)
+        _send_admin_alert(
+            f"Haber özeti Gemini çağrısı başarısız.\n"
+            f"Hata: <code>{type(e).__name__}: {e}</code>\n"
+            f"Digest çevirisiz/içgörüsüz gönderilecek."
+        )
+        return {"stories": [], "fayda": "", "proje": ""}
 
 
 # ── Pi Durumu ────────────────────────────────────────────────────────────────
@@ -215,12 +278,8 @@ def _telegram_send(token: str, chat_id: str, text: str) -> None:
         "chat_id": chat_id, "text": text,
         "parse_mode": "HTML", "disable_web_page_preview": True,
     }).encode()
-    req = urllib.request.Request(
-        f"https://api.telegram.org/bot{token}/sendMessage",
-        data=payload, headers={"Content-Type": "application/json"}, method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        result = json.loads(resp.read())
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    result = _http_post_json(url, payload, timeout=15)
     if not result.get("ok"):
         raise RuntimeError(f"Telegram API hatasi: {result}")
 
@@ -261,7 +320,10 @@ def run_news_routine() -> None:
         logger.info("Telegram'a gonderildi")
     except urllib.error.URLError as e:
         logger.error("Baglanti hatasi: %s", e)
+        _send_admin_alert(f"Haber rutini bağlantı hatasıyla başarısız oldu: <code>{e}</code>")
     except RuntimeError as e:
         logger.error("Hata: %s", e)
+        _send_admin_alert(f"Haber rutini hatası: <code>{e}</code>")
     except Exception as e:
         logger.exception("Beklenmeyen hata: %s", e)
+        _send_admin_alert(f"Haber rutini beklenmeyen hata: <code>{type(e).__name__}: {e}</code>")
