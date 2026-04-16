@@ -12,7 +12,9 @@ Tek seferlik test:
     python -c "from youtube_tracker.tracker import run_youtube_tracker; run_youtube_tracker()"
 """
 
+import json
 import logging
+import os
 import time
 from datetime import datetime
 
@@ -30,7 +32,6 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-import json
 with open(os.path.join(os.path.dirname(__file__), "config.json")) as _f:
     _CFG = json.load(_f)
 
