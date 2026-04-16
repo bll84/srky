@@ -40,15 +40,37 @@ def _resolve_channel_id(handle: str) -> str:
 
 
 def _load_state() -> dict:
-    if os.path.exists(STATE_FILE):
+    """State'i yükle. Parse hatası varsa (bozuk dosya) boş dict döner
+    ve bozuk dosya .corrupt uzantısıyla yan tarafa alınır — böylece
+    işletim devam eder ama bozulma kanıtı kaybolmaz.
+    """
+    if not os.path.exists(STATE_FILE):
+        return {}
+    try:
         with open(STATE_FILE) as f:
             return json.load(f)
-    return {}
+    except (json.JSONDecodeError, OSError) as e:
+        logger.error("seen_videos.json bozuk, sıfırlanıyor: %s", e)
+        try:
+            os.replace(STATE_FILE, STATE_FILE + ".corrupt")
+        except OSError:
+            pass
+        return {}
 
 
 def _save_state(state: dict) -> None:
-    with open(STATE_FILE, "w") as f:
+    """State'i atomik yaz: önce .tmp'ye yaz, sonra rename.
+
+    Doğrudan STATE_FILE'a yazmak crash/çekilen fişte dosyayı bozuyordu;
+    sonraki çalıştırmada dict parse edilemeyip tüm videolar "yeni"
+    sayılıyor, yüzlerce eski video bombardımanı yapılıyordu.
+    """
+    tmp = STATE_FILE + ".tmp"
+    with open(tmp, "w") as f:
         json.dump(state, f, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, STATE_FILE)
 
 
 def _fetch_channel_videos(channel_id: str) -> list[dict]:
