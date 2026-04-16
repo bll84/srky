@@ -284,24 +284,63 @@ def _telegram_send(token: str, chat_id: str, text: str) -> None:
         raise RuntimeError(f"Telegram API hatasi: {result}")
 
 
-def send_telegram(text: str) -> None:
-    token = os.environ["TELEGRAM_BOT_TOKEN"]
-    chat_id = os.environ["TELEGRAM_CHAT_ID"]
-    if len(text) <= 4096:
-        _telegram_send(token, chat_id, text)
-        return
-    chunks, current = [], ""
+_TELEGRAM_LIMIT = 4096
+
+
+def _split_oversized(block: str, limit: int) -> list[str]:
+    """Tek parça limit üstüyse satır → boşluk → hard-cut sırasıyla böl.
+
+    Bu kod tabanındaki HTML etiketleri hep satır içinde kapandığı için
+    \\n üzerinden kesmek etiket çiftlerini bozmaz.
+    """
+    parts: list[str] = []
+    remaining = block
+    while len(remaining) > limit:
+        cut = remaining.rfind("\n", 0, limit)
+        if cut < limit // 2:  # satır yoksa kelimeye in
+            cut = remaining.rfind(" ", 0, limit)
+        if cut < limit // 2:  # çok yapışık → hard cut
+            cut = limit
+        parts.append(remaining[:cut])
+        remaining = remaining[cut:].lstrip()
+    if remaining:
+        parts.append(remaining)
+    return parts
+
+
+def _chunk_html_safe(text: str, limit: int = _TELEGRAM_LIMIT) -> list[str]:
+    """Telegram limit'ine göre HTML-güvenli chunk'lar üret.
+
+    Önce \\n\\n paragraf sınırlarında birleştirir; tek paragraf limit'i
+    aşıyorsa _split_oversized ile satır/boşluk sınırında böler. Hiçbir
+    chunk > limit olmaz.
+    """
+    chunks: list[str] = []
+    current = ""
     for block in text.split("\n\n"):
-        candidate = current + "\n\n" + block if current else block
-        if len(candidate) > 4096:
+        if len(block) > limit:
             if current:
                 chunks.append(current)
+                current = ""
+            parts = _split_oversized(block, limit)
+            chunks.extend(parts[:-1])
+            current = parts[-1]
+            continue
+        candidate = f"{current}\n\n{block}" if current else block
+        if len(candidate) > limit:
+            chunks.append(current)
             current = block
         else:
             current = candidate
     if current:
         chunks.append(current)
-    for chunk in chunks:
+    return chunks
+
+
+def send_telegram(text: str) -> None:
+    token = os.environ["TELEGRAM_BOT_TOKEN"]
+    chat_id = os.environ["TELEGRAM_CHAT_ID"]
+    for chunk in _chunk_html_safe(text):
         _telegram_send(token, chat_id, chunk)
 
 
