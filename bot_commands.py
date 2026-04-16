@@ -3,8 +3,15 @@ Telegram bot komut işleyici.
 n8n tarafından çağrılır, sonucu stdout'a yazar.
 
 Kullanım:
-  python3 bot_commands.py /haber
-  python3 bot_commands.py "bugün ne var"
+  python3 bot_commands.py /haber <sender_chat_id>
+  python3 bot_commands.py "bugün ne var" <sender_chat_id>
+
+Güvenlik: TELEGRAM_ADMIN_IDS env var'ı tanımlıysa sadece oradaki
+chat_id'ler komut çalıştırabilir. Tanımlı değilse (geliştirme modu)
+tüm sender'lar kabul edilir.
+
+Verimlilik: _detect_command önce keyword match dener, eşleşme yoksa
+Gemini'ye düşer — her doğal dil mesajı API kotası yemez.
 """
 import sys
 import os
@@ -17,8 +24,29 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-def _detect_command(text: str) -> str:
-    """Use Gemini to detect which command the user wants."""
+# Komut → anahtar kelime eşlemesi. Alt string match (küçük harfli metinde).
+# Sıralamanın önemi var: daha spesifik komutlar önce gelmeli.
+_KEYWORD_MAP: list[tuple[list[str], str]] = [
+    (["haber", "gündem", "llm", "yapay zeka", "ai haber"], "/haber"),
+    # Türkçe ek almaları için kökler: "sıcakl" → sıcaklık/sıcaklığı/…
+    (["sıcakl", "ram", "disk", "uptime", "pi durum", "raspberry"], "/pi"),
+    (["servis", "çalışıyor", "ayakta", "durum"], "/durum"),
+    (["youtube", "video", "kanal"], "/youtube"),
+    (["yardım", "komut", "ne yapabilir", "nasıl", "start"], "/yardim"),
+]
+
+
+def _keyword_match(text: str) -> str | None:
+    """Keyword tabanlı komut router. Eşleşme yoksa None."""
+    t = text.lower()
+    for keywords, cmd in _KEYWORD_MAP:
+        if any(k in t for k in keywords):
+            return cmd
+    return None
+
+
+def _gemini_detect_command(text: str) -> str:
+    """Keyword match başarısız olduğunda Gemini'ye sor."""
     api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
         return "/yardim"
@@ -50,6 +78,23 @@ def _detect_command(text: str) -> str:
         return result if result.startswith("/") else "/yardim"
     except Exception:
         return "/yardim"
+
+
+def _detect_command(text: str) -> str:
+    """Önce keyword match, sonra Gemini fallback."""
+    matched = _keyword_match(text)
+    if matched:
+        return matched
+    return _gemini_detect_command(text)
+
+
+def _is_authorized(sender: str) -> bool:
+    """TELEGRAM_ADMIN_IDS set'inde sender varsa True. Env yoksa True (dev modu)."""
+    allowed_raw = os.environ.get("TELEGRAM_ADMIN_IDS", "").strip()
+    if not allowed_raw:
+        return True  # dev modu: allowlist tanımlı değil
+    allowed = {x.strip() for x in allowed_raw.split(",") if x.strip()}
+    return sender in allowed
 
 def cmd_pi():
     from llm_news.routine import get_pi_status
@@ -103,6 +148,11 @@ COMMANDS = {
 
 if __name__ == "__main__":
     text = sys.argv[1].strip() if len(sys.argv) > 1 else "/yardim"
+    sender = sys.argv[2].strip() if len(sys.argv) > 2 else ""
+
+    if not _is_authorized(sender):
+        print("🚫 Yetkisiz erişim. Bu bot yalnızca yetkili kullanıcılara açıktır.")
+        sys.exit(1)
 
     # Slash komutu mu yoksa doğal dil mi?
     if text.startswith("/"):
