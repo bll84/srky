@@ -4,3 +4,7 @@ __pycache__/
 .env
 venv/
 youtube_tracker/seen_videos.json
+youtube_tracker/seen_videos.json.tmp
+youtube_tracker/seen_videos.json.corrupt
+subscribers.db
+subscribers.db-journal

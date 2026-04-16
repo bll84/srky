@@ -348,19 +348,55 @@ def send_telegram(text: str) -> None:
         _telegram_send(token, chat_id, chunk)
 
 
+# ── Abone migration ──────────────────────────────────────────────────────────
+
+def _bootstrap_admin_subscriber() -> None:
+    """İlk çalıştırmada TELEGRAM_CHAT_ID'yi admin abone olarak ekle.
+
+    Bu yumuşak migration: hiç abone yokken env'deki chat_id otomatik kaydolur,
+    böylece servis upgrade edildiğinde mevcut kullanıcı `/abone` yazmadan
+    digest almaya devam eder.
+    """
+    from subscribers.db import init_db, count_active, add_subscriber
+    init_db()
+    admin_id = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+    if admin_id and count_active() == 0:
+        add_subscriber(admin_id, slot="both")
+        logger.info("Admin %s bootstrap abone olarak eklendi", admin_id)
+
+
 # ── Ana Rutin ─────────────────────────────────────────────────────────────────
 
 def run_news_routine() -> None:
+    from subscribers.broadcast import broadcast_html
+    from subscribers.db import count_active
+
     now = datetime.now(ISTANBUL_TZ)
-    slot = "Sabah" if now.hour < 12 else "Aksam"
-    header = f"LLM Haber Ozeti — {now.strftime('%d %B %Y')} ({slot})"
+    # DB için slot (morning/evening) — digest filter
+    db_slot = "morning" if now.hour < 12 else "evening"
+    # Başlık için TR
+    slot_tr = "Sabah" if db_slot == "morning" else "Aksam"
+    header = f"LLM Haber Ozeti — {now.strftime('%d %B %Y')} ({slot_tr})"
     logger.info("Baslıyor: %s", header)
     try:
+        _bootstrap_admin_subscriber()
+        if count_active() == 0:
+            logger.warning("Hiç abone yok, digest üretilmeyecek")
+            return
         stories = fetch_llm_news()
         logger.info("%d haber bulundu", len(stories))
         text = format_for_telegram(stories, header)
-        send_telegram(text)
-        logger.info("Telegram'a gonderildi")
+        stats = broadcast_html(text, slot=db_slot)
+        logger.info(
+            "Digest gonderildi: sent=%d blocked=%d failed=%d / toplam=%d",
+            stats["sent"], stats["blocked"], stats["failed"], stats["total"],
+        )
+        # Başarı oranı %50'nin altındaysa admin'e uyar
+        if stats["total"] > 0 and stats["sent"] / stats["total"] < 0.5:
+            _send_admin_alert(
+                f"Digest başarı oranı düşük: {stats['sent']}/{stats['total']} "
+                f"gönderildi (blocked={stats['blocked']}, failed={stats['failed']})."
+            )
     except urllib.error.URLError as e:
         logger.error("Baglanti hatasi: %s", e)
         _send_admin_alert(f"Haber rutini bağlantı hatasıyla başarısız oldu: <code>{e}</code>")
