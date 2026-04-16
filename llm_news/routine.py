@@ -198,7 +198,7 @@ Kurallar:
 # ── Pi Durumu ────────────────────────────────────────────────────────────────
 
 def get_pi_status() -> str:
-    import shutil, socket
+    import shutil
     lines = ["🖥️ <b>Pi Durumu</b>"]
     try:
         temp = int(open("/sys/class/thermal/thermal_zone0/temp").read().strip()) / 1000
@@ -225,10 +225,14 @@ def get_pi_status() -> str:
         lines.append(f"⏱️ Çalışma: {f'{d}g {h}sa' if d else f'{h}sa {m}dk' if h else f'{m}dk'}")
     except Exception:
         pass
-    try:
-        lines.append(f"🌐 IP: {socket.gethostbyname(socket.gethostname())}")
-    except Exception:
-        pass
+    # İç IP — abone sistemine geçince müşterilere görünmemeli.
+    # SHOW_INTERNAL_IP=1 ile açıkça aç.
+    if os.environ.get("SHOW_INTERNAL_IP") == "1":
+        try:
+            import socket
+            lines.append(f"🌐 IP: {socket.gethostbyname(socket.gethostname())}")
+        except Exception:
+            pass
     return "\n".join(lines)
 
 
