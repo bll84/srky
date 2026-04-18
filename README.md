@@ -1,29 +1,29 @@
-# LED Control Script
+# LED Kontrol Script'i
 
-This script controls an LED connected to a Raspberry Pi's GPIO pin.
+Bu script, Raspberry Pi'nin GPIO pinine bağlı bir LED'i kontrol eder.
 
-## Hardware Setup
+## Donanım Kurulumu
 
-1.  Connect an LED to GPIO pin 17 (or the pin specified in `led_control.py`).
-    *   Connect the longer leg (anode) of the LED to GPIO pin 17.
-    *   Connect the shorter leg (cathode) of the LED to a resistor (e.g., 330 Ohms).
-    *   Connect the other end of the resistor to a Ground (GND) pin on the Raspberry Pi.
+1.  LED'i GPIO pin 17'ye (veya `led_control.py` içinde belirtilen pine) bağlayın.
+    *   LED'in uzun bacağını (anot) GPIO pin 17'ye bağlayın.
+    *   LED'in kısa bacağını (katot) bir dirence (örn. 330 Ohm) bağlayın.
+    *   Direncin diğer ucunu Raspberry Pi'deki bir Toprak (GND) pinine bağlayın.
 
-## Running the Script
+## Script'i Çalıştırma
 
-1.  Ensure you have the RPi.GPIO library installed. If not, install it using:
+1.  RPi.GPIO kütüphanesinin kurulu olduğundan emin olun. Kurulu değilse şu komutla yükleyin:
     ```bash
     pip install RPi.GPIO
     ```
-2.  Run the script using Python:
+2.  Script'i Python ile çalıştırın:
     ```bash
     python led_control.py
     ```
-    You might need to use `sudo python led_control.py` if you encounter permission issues.
+    İzin sorunu yaşarsanız `sudo python led_control.py` kullanmanız gerekebilir.
 
-## Script Overview
+## Script'e Genel Bakış
 
-The `led_control.py` script will:
-*   Initialize the GPIO pins.
-*   Blink the LED connected to the specified pin 5 times with a 1-second interval.
-*   Clean up the GPIO settings on exit.
+`led_control.py` script'i şunları yapar:
+*   GPIO pinlerini başlatır.
+*   Belirtilen pine bağlı LED'i 1 saniye aralıklarla 5 kez yakıp söndürür.
+*   Çıkışta GPIO ayarlarını temizler.
