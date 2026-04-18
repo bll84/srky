@@ -1,36 +1,36 @@
 import RPi.GPIO as GPIO
 import time
 
-# Set GPIO mode
+# GPIO modunu ayarla
 GPIO.setmode(GPIO.BCM)
 
-# Define LED pin
+# LED pinini tanımla
 LED_PIN = 17
 
-# Set up LED pin as output
+# LED pinini çıkış olarak ayarla
 GPIO.setup(LED_PIN, GPIO.OUT)
 
-def led_on(pin):
-    """Turns the LED on."""
+def led_yak(pin):
+    """LED'i yakar."""
     GPIO.output(pin, GPIO.HIGH)
 
-def led_off(pin):
-    """Turns the LED off."""
+def led_sondur(pin):
+    """LED'i söndürür."""
     GPIO.output(pin, GPIO.LOW)
 
 if __name__ == "__main__":
     try:
         for _ in range(5):
-            print("LED ON")
-            led_on(LED_PIN)
+            print("LED AÇIK")
+            led_yak(LED_PIN)
             time.sleep(1)
-            
-            print("LED OFF")
-            led_off(LED_PIN)
+
+            print("LED KAPALI")
+            led_sondur(LED_PIN)
             time.sleep(1)
-            
+
     except KeyboardInterrupt:
-        print("Exiting...")
+        print("Çıkılıyor...")
     finally:
         GPIO.cleanup()
-        print("GPIO cleanup complete.")
+        print("GPIO temizleme tamamlandı.")
